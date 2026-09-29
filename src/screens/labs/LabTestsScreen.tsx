@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,199 +13,331 @@ import {
   MapPin,
   ChevronDown,
   Search,
-  Star,
-  Clock,
-  Home as HomeIcon,
+  ShoppingCart,
   CheckCircle2,
+  ChevronRight,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
-import { useLabTests } from '../../api/diagnosticsApi';
-import { MOCK_LAB_PARTNERS, MOCK_POPULAR_TESTS } from '../../api/diagnosticsApi';
+import { MOCK_POPULAR_TESTS } from '../../api/diagnosticsApi';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
-import type { TestCategory } from '../../api/types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const CATEGORIES: { id: TestCategory; label: string; emoji: string }[] = [
-  { id: 'FULL_BODY', label: 'Full Body Checkup', emoji: '🧬' },
-  { id: 'FEVER', label: 'Fever', emoji: '🤒' },
-  { id: 'THYROID', label: 'Thyroid', emoji: '🦋' },
-  { id: 'DIABETES', label: 'Diabetes', emoji: '🩸' },
-  { id: 'CARDIAC', label: 'Cardiac Care', emoji: '❤️' },
-  { id: 'ALLERGY', label: 'Allergy', emoji: '🌿' },
-  { id: 'HAIR_SKIN', label: 'Hair & Skin', emoji: '💆' },
-  { id: 'WOMENS_HEALTH', label: 'Women\'s Health', emoji: '🌸' },
+// ─── Popular Test Categories (circular avatar grid) ───────────────────────────
+const POPULAR_CATEGORIES = [
+  { id: 'full-body',  label: 'Full Body\nCheckups',  emoji: '🧬', bg: '#EEF3FF' },
+  { id: 'fever',      label: 'Fever',                emoji: '🤒', bg: '#FFF1EC' },
+  { id: 'thyroid',    label: 'Thyroid',              emoji: '🦋', bg: '#EAF8F4' },
+  { id: 'diabetes',   label: 'Diabetes',             emoji: '🩸', bg: '#FEE2E2' },
+  { id: 'heart',      label: 'Heart\nHealth',        emoji: '❤️', bg: '#FEE2E2' },
+  { id: 'allergy',    label: 'Allergy\nTests',       emoji: '🌿', bg: '#EAF8F4' },
+  { id: 'hair',       label: 'Hair &\nSkin',         emoji: '💆', bg: '#FEF3C7' },
+  { id: 'women',      label: 'Women\nHealth',        emoji: '🌸', bg: '#FFF1EC' },
+];
+
+// ─── Lab Packages (horizontal scroll) ─────────────────────────────────────────
+const LAB_PACKAGES = [
+  { id: 'pkg-women', label: 'For Women',    emoji: '👩‍⚕️', bg: '#FFF1EC', tests: 'Ovary, fertility, thyroid' },
+  { id: 'pkg-men',   label: 'For Men',      emoji: '👨‍⚕️', bg: '#EEF3FF', tests: 'Testosterone, heart health' },
+  { id: 'pkg-xray',  label: 'X-Rays',       emoji: '🦴',   bg: '#F5F5F5', tests: 'Chest, bone density tests' },
+  { id: 'pkg-card',  label: 'Cardiac\nTests', emoji: '💓', bg: '#FEE2E2', tests: 'Total heart assessment' },
+  { id: 'pkg-adv',   label: 'Advanced\nTests', emoji: '🔬', bg: '#EAF8F4', tests: 'Allergy, genetics, etc' },
+];
+
+// ─── Combo Offers ──────────────────────────────────────────────────────────────
+const COMBO_OFFERS = [
+  {
+    id: 'combo-1',
+    title: 'Wellness Basic',
+    description: 'CBC + Thyroid + Lipid Profile',
+    originalPrice: 1299,
+    price: 799,
+    saving: '38%',
+    emoji: '💊',
+    color: Colors.royalBlue,
+    bg: Colors.blueBg,
+  },
+  {
+    id: 'combo-2',
+    title: 'Diabetes Care Pack',
+    description: 'HbA1c + FBS + Kidney Function',
+    originalPrice: 999,
+    price: 649,
+    saving: '35%',
+    emoji: '🩺',
+    color: Colors.teal,
+    bg: Colors.tealBg,
+  },
 ];
 
 export function LabTestsScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [location, setLocation] = useState('Goregaon');
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<TestCategory | undefined>();
 
-  const { data: tests, isLoading } = useLabTests(selectedCategory);
+  const handleSearchFocus = (testId?: string, testName?: string) => {
+    navigation.navigate('LabSearch', testId ? { testId, testName } : undefined);
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <LinearGradient colors={[Colors.royalBlue, Colors.royalBlueDark]} style={styles.header}>
-        <View style={styles.locationRow}>
-          <MapPin size={14} color={Colors.white} strokeWidth={2.5} />
-          <Text style={styles.locationText}>{location}</Text>
-          <ChevronDown size={14} color={Colors.white} strokeWidth={2.5} />
+      {/* ── Header ── */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity style={styles.locationRow} id="btn-location-lab">
+            <MapPin size={14} color={Colors.royalBlue} strokeWidth={2.5} />
+            <Text style={styles.locationText}>Goregaon</Text>
+            <ChevronDown size={14} color={Colors.royalBlue} strokeWidth={2.5} />
+          </TouchableOpacity>
+          <TouchableOpacity id="btn-lab-cart" style={styles.cartBtn}>
+            <ShoppingCart size={20} color={Colors.textSecondary} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Hero doctor illustration area */}
+        <View style={styles.heroRow}>
+          <View style={styles.heroAvatars}>
+            <View style={[styles.heroAvatar, styles.heroAvatarLeft]}>
+              <Text style={styles.heroAvatarEmoji}>👨‍⚕️</Text>
+            </View>
+            <View style={[styles.heroAvatar, styles.heroAvatarRight]}>
+              <Text style={styles.heroAvatarEmoji}>👩‍⚕️</Text>
+            </View>
+          </View>
         </View>
 
         {/* Search Bar */}
-        <View style={styles.searchBar}>
+        <TouchableOpacity
+          id="btn-lab-search-bar"
+          style={styles.searchBar}
+          onPress={handleSearchFocus}
+          activeOpacity={0.8}
+        >
           <Search size={16} color={Colors.textMuted} strokeWidth={2} />
-          <TextInput
-            id="input-lab-search"
-            style={styles.searchInput}
-            placeholder="Search for a test..."
-            placeholderTextColor={Colors.textMuted}
-            value={search}
-            onChangeText={setSearch}
-          />
-        </View>
-      </LinearGradient>
+          <Text style={styles.searchPlaceholder}>Search for "X-Ray"</Text>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Popular Tests Grid */}
+
+        {/* ── Popular Tests 4×2 Grid ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Popular Tests</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
-            {CATEGORIES.map((cat) => (
+          <View style={styles.popularGrid}>
+            {POPULAR_CATEGORIES.map((cat) => (
               <TouchableOpacity
                 key={cat.id}
-                id={`btn-category-${cat.id}`}
-                onPress={() => setSelectedCategory(selectedCategory === cat.id ? undefined : cat.id)}
-                style={[
-                  styles.categoryCard,
-                  selectedCategory === cat.id && styles.categoryCardActive,
-                ]}
+                id={`btn-popular-${cat.id}`}
+                style={styles.popularItem}
+                onPress={() => navigation.navigate('LabSearch', { testName: cat.label.replace('\n', ' ') })}
                 activeOpacity={0.8}
               >
-                <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
-                <Text style={[styles.categoryLabel, selectedCategory === cat.id && styles.categoryLabelActive]}>
-                  {cat.label}
-                </Text>
+                <View style={[styles.popularCircle, { backgroundColor: cat.bg }]}>
+                  <Text style={styles.popularEmoji}>{cat.emoji}</Text>
+                </View>
+                <Text style={styles.popularLabel}>{cat.label}</Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
         </View>
 
-        {/* Lab Delivery Banner */}
-        <View style={styles.deliveryBanner}>
+        {/* ── Delivery at Your Doorstep Banner ── */}
+        <View style={styles.deliveryBannerWrap}>
           <LinearGradient
-            colors={['#EEF3FF', '#EAF8F4']}
-            style={styles.deliveryGradient}
+            colors={['#1E5AFF', '#4A7CFF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.deliveryBanner}
           >
-            <Text style={styles.deliveryEmoji}>🚗</Text>
-            <View>
-              <Text style={styles.deliveryTitle}>Delivery at your doorstep,{'\n'}best prices overall</Text>
+            <View style={styles.deliveryLeft}>
+              <Text style={styles.deliveryTitle}>Delivery at{'\n'}your doorstep,{'\n'}best prices overall</Text>
               <View style={styles.deliveryBadges}>
-                {['NABL Accredited', 'Home Collection', 'On-time Reports'].map((badge) => (
-                  <View key={badge} style={styles.badge}>
-                    <CheckCircle2 size={10} color={Colors.teal} strokeWidth={2.5} />
-                    <Text style={styles.badgeText}>{badge}</Text>
-                  </View>
-                ))}
+                <View style={styles.deliveryBadge}>
+                  <CheckCircle2 size={12} color={Colors.white} strokeWidth={2.5} />
+                  <Text style={styles.deliveryBadgeText}>Best Prices</Text>
+                </View>
+                <View style={styles.deliveryBadge}>
+                  <CheckCircle2 size={12} color={Colors.white} strokeWidth={2.5} />
+                  <Text style={styles.deliveryBadgeText}>On-time Delivery</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.deliveryRight}>
+              <Text style={styles.deliveryIllustrationEmoji}>🚐</Text>
+              <View style={styles.deliveryHeartRing}>
+                <Text style={styles.deliveryHeartEmoji}>❤️</Text>
               </View>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Tests List */}
+        {/* ── Lab Tests & Packages ── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {selectedCategory ? `${CATEGORIES.find(c => c.id === selectedCategory)?.label}` : 'Lab Tests & Packages'}
-            </Text>
+            <Text style={styles.sectionTitle}>Lab tests & Packages</Text>
+            <TouchableOpacity id="btn-view-all-packages">
+              <Text style={styles.viewAll}>View All →</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.sectionSub}>Accurate results. Reliable care</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.packagesScroll}
+          >
+            {LAB_PACKAGES.map((pkg) => (
+              <TouchableOpacity
+                key={pkg.id}
+                id={`btn-package-${pkg.id}`}
+                style={styles.packageCard}
+                onPress={() => navigation.navigate('LabSearch', { testName: pkg.label.replace('\n', ' ') })}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.packageIconBox, { backgroundColor: pkg.bg }]}>
+                  <Text style={styles.packageEmoji}>{pkg.emoji}</Text>
+                </View>
+                <Text style={styles.packageLabel}>{pkg.label}</Text>
+                <Text style={styles.packageTests}>{pkg.tests}</Text>
+                <View style={styles.packageArrow}>
+                  <ChevronRight size={12} color={Colors.royalBlue} strokeWidth={2.5} />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* ── Popular Lab Test Cards ── */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Top Tests</Text>
             <TouchableOpacity id="btn-view-all-tests">
               <Text style={styles.viewAll}>View All →</Text>
             </TouchableOpacity>
           </View>
-
-          {isLoading ? (
-            <ActivityIndicator color={Colors.royalBlue} style={{ marginTop: Spacing.xl }} />
-          ) : (
-            (tests ?? MOCK_POPULAR_TESTS).map((test) => (
-              <TouchableOpacity
-                key={test.id}
-                id={`btn-test-${test.id}`}
-                onPress={() => navigation.navigate('LabTestDetail', { testId: test.id })}
-                style={styles.testCard}
-                activeOpacity={0.88}
-              >
-                <View style={styles.testCardLeft}>
-                  <Text style={styles.testName}>{test.name}</Text>
-                  <Text style={styles.testIncludes}>
-                    {test.includes?.slice(0, 3).join(' · ')}
-                    {(test.includes?.length ?? 0) > 3 ? ` +${test.includes!.length - 3} more` : ''}
-                  </Text>
-                  <View style={styles.testMeta}>
-                    <View style={[styles.metaTag, test.fasting ? styles.metaTagWarning : styles.metaTagSuccess]}>
-                      <Text style={styles.metaTagText}>
-                        {test.fasting ? '⚠️ Fasting YES' : '✅ No Fasting'}
-                      </Text>
-                    </View>
-                    <View style={styles.metaTag}>
-                      <Text style={styles.metaTagText}>🩸 {test.sampleType}</Text>
-                    </View>
-                    <View style={styles.metaTag}>
-                      <Clock size={10} color={Colors.textMuted} strokeWidth={2} />
-                      <Text style={styles.metaTagText}>{test.turnaroundHours}h</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.testCardRight}>
+          {MOCK_POPULAR_TESTS.slice(0, 4).map((test) => (
+            <TouchableOpacity
+              key={test.id}
+              id={`btn-test-${test.id}`}
+              style={styles.testCard}
+              onPress={() => navigation.navigate('LabSearch', { testId: test.id, testName: test.name })}
+              activeOpacity={0.88}
+            >
+              <View style={styles.testCardIconBox}>
+                <Text style={styles.testCardEmoji}>🔬</Text>
+              </View>
+              <View style={styles.testCardInfo}>
+                <View style={styles.testCardTopRow}>
+                  <Text style={styles.testCardName}>{test.name}</Text>
                   {test.aiPowered && (
-                    <View style={styles.aiBadge}>
-                      <Text style={styles.aiText}>🤖 AI</Text>
+                    <View style={styles.aiChip}>
+                      <Text style={styles.aiChipText}>🤖 AI</Text>
                     </View>
                   )}
-                  <View style={styles.priceBlock}>
-                    {test.discountedPrice && (
-                      <Text style={styles.originalPrice}>₹{test.price}</Text>
-                    )}
-                    <Text style={styles.price}>₹{test.discountedPrice ?? test.price}</Text>
-                  </View>
-                  <TouchableOpacity
-                    id={`btn-book-test-${test.id}`}
-                    style={styles.bookBtn}
-                    onPress={() => navigation.navigate('LabTestDetail', { testId: test.id })}
-                  >
-                    <Text style={styles.bookBtnText}>Book Test</Text>
-                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-            ))
-          )}
+                <Text style={styles.testCardIncludes} numberOfLines={1}>
+                  {test.includes?.slice(0, 3).join(' · ')}
+                  {(test.includes?.length ?? 0) > 3 ? ` +${test.includes!.length - 3}` : ''}
+                </Text>
+                <View style={styles.testCardMeta}>
+                  <View style={[styles.metaTag, test.fasting ? styles.metaTagWarn : styles.metaTagOk]}>
+                    <Text style={styles.metaTagText}>{test.fasting ? '⚠️ Fasting' : '✅ No Fasting'}</Text>
+                  </View>
+                  <View style={styles.metaTag}>
+                    <Text style={styles.metaTagText}>🩸 {test.sampleType}</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.testCardRight}>
+                {test.discountedPrice && (
+                  <Text style={styles.originalPrice}>₹{test.price}</Text>
+                )}
+                <Text style={styles.price}>₹{test.discountedPrice ?? test.price}</Text>
+                <TouchableOpacity
+                  id={`btn-book-${test.id}`}
+                  style={styles.bookBtn}
+                  onPress={() => navigation.navigate('LabSearch', { testId: test.id, testName: test.name })}
+                >
+                  <Text style={styles.bookBtnText}>Book</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* Combo Offers */}
+        {/* ── Combo Offers ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Combo Offers</Text>
+          {COMBO_OFFERS.map((combo) => (
+            <TouchableOpacity
+              key={combo.id}
+              id={`btn-combo-${combo.id}`}
+              style={styles.comboCard}
+              activeOpacity={0.88}
+            >
+              <View style={[styles.comboIconBox, { backgroundColor: combo.bg }]}>
+                <Text style={styles.comboEmoji}>{combo.emoji}</Text>
+              </View>
+              <View style={styles.comboInfo}>
+                <Text style={styles.comboTitle}>{combo.title}</Text>
+                <Text style={styles.comboDesc}>{combo.description}</Text>
+                <View style={styles.comboPriceRow}>
+                  <Text style={styles.comboPrice}>₹{combo.price}</Text>
+                  <Text style={styles.comboOriginal}>₹{combo.originalPrice}</Text>
+                  <View style={[styles.savingBadge, { backgroundColor: combo.bg }]}>
+                    <Text style={[styles.savingText, { color: combo.color }]}>Save {combo.saving}</Text>
+                  </View>
+                </View>
+              </View>
+              <ChevronRight size={18} color={Colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── Accessible & Affordable Section ── */}
+        <View style={styles.accessibleSection}>
           <LinearGradient
-            colors={[Colors.tealBg, Colors.blueBg]}
-            style={styles.comboCard}
+            colors={[Colors.blueBg, '#F0FFF4']}
+            style={styles.accessibleGradient}
           >
-            <Text style={styles.comboEmoji}>🎯</Text>
-            <View style={styles.comboInfo}>
-              <Text style={styles.comboTitle}>Accessible & Affordable</Text>
-              <Text style={styles.comboSub}>Premium diagnostics at unbeatable prices</Text>
+            {/* Text side */}
+            <View style={styles.accessibleLeft}>
+              <Text style={styles.accessibleTitle}>Accessible &{'\n'}Affordable</Text>
+              <View style={styles.accessibleFeatures}>
+                <View style={styles.accessibleFeature}>
+                  <View style={styles.accessibleFeatureIcon}>
+                    <CheckCircle2 size={14} color={Colors.royalBlue} strokeWidth={2.5} />
+                  </View>
+                  <Text style={styles.accessibleFeatureText}>NABL Accredited labs</Text>
+                </View>
+                <View style={styles.accessibleFeature}>
+                  <View style={styles.accessibleFeatureIcon}>
+                    <CheckCircle2 size={14} color={Colors.teal} strokeWidth={2.5} />
+                  </View>
+                  <Text style={styles.accessibleFeatureText}>Seamless collection</Text>
+                </View>
+                <View style={styles.accessibleFeature}>
+                  <View style={styles.accessibleFeatureIcon}>
+                    <CheckCircle2 size={14} color={Colors.teal} strokeWidth={2.5} />
+                  </View>
+                  <Text style={styles.accessibleFeatureText}>On-time reports</Text>
+                </View>
+              </View>
+            </View>
+            {/* Illustration side */}
+            <View style={styles.accessibleRight}>
+              <Text style={styles.accessibleIllustration}>👩‍⚕️</Text>
+              <Text style={styles.accessibleIllustration2}>👨</Text>
+              {/* Medical items */}
+              <View style={styles.medicalItems}>
+                <Text style={styles.medicalItem}>💊</Text>
+                <Text style={styles.medicalItem}>🩺</Text>
+                <Text style={styles.medicalItem}>🔬</Text>
+              </View>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Privacy Footer */}
-        <View style={styles.privacySection}>
-          <Text style={styles.privacyMain}>Your Data Is</Text>
-          <Text style={styles.privacyDevanagari}>सुरक्षित & Private</Text>
-          <Text style={styles.privacyWith}>with Bionex.</Text>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -214,35 +345,84 @@ export function LabTestsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: Spacing.base, paddingTop: Spacing.md, paddingBottom: Spacing.xl },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: Spacing.md },
-  locationText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.semiBold,
-    color: Colors.white,
+
+  // ── Header ──
+  header: {
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.base,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.base,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  locationText: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.bold,
+    color: Colors.textPrimary,
+  },
+  cartBtn: { padding: 4 },
+  heroRow: {
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    height: 56,
+    justifyContent: 'center',
+  },
+  heroAvatars: { flexDirection: 'row', gap: Spacing.sm },
+  heroAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.blueBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.sm,
+  },
+  heroAvatarLeft: { backgroundColor: Colors.blueBg },
+  heroAvatarRight: { backgroundColor: Colors.tealBg },
+  heroAvatarEmoji: { fontSize: 28 },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  searchInput: {
+  searchPlaceholder: {
     flex: 1,
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.textPrimary,
+    color: Colors.textMuted,
   },
-  scrollContent: { paddingBottom: Spacing['4xl'] },
+
+  scrollContent: { paddingBottom: 40 },
   section: { paddingHorizontal: Spacing.base, marginTop: Spacing.xl },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   sectionTitle: {
     fontSize: Typography.fontSize.lg,
     fontFamily: Typography.fontFamily.bold,
     color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+  },
+  sectionSub: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.textMuted,
     marginBottom: Spacing.md,
   },
   viewAll: {
@@ -250,86 +430,184 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.semiBold,
     color: Colors.royalBlue,
   },
-  categoriesScroll: { gap: Spacing.sm, paddingBottom: 4 },
-  categoryCard: {
-    width: 85,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.sm,
+
+  // ── Popular Grid (4×2) ──
+  popularGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  popularItem: {
+    width: '23%',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    marginBottom: Spacing.sm,
+  },
+  popularCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.sm,
+  },
+  popularEmoji: { fontSize: 28 },
+  popularLabel: {
+    fontSize: 10,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+
+  // ── Delivery Banner ──
+  deliveryBannerWrap: {
+    marginHorizontal: Spacing.base,
+    marginTop: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    ...Shadows.md,
+  },
+  deliveryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.xl,
+    minHeight: 130,
+  },
+  deliveryLeft: { flex: 1 },
+  deliveryTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontFamily: Typography.fontFamily.bold,
+    color: Colors.white,
+    lineHeight: 26,
+    marginBottom: Spacing.md,
+  },
+  deliveryBadges: { gap: 6 },
+  deliveryBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  deliveryBadgeText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  deliveryRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  deliveryIllustrationEmoji: { fontSize: 50 },
+  deliveryHeartRing: {
+    position: 'absolute',
+    bottom: -8,
+    right: -8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deliveryHeartEmoji: { fontSize: 14 },
+
+  // ── Lab Packages Horizontal Scroll ──
+  packagesScroll: { gap: Spacing.sm, paddingBottom: 4 },
+  packageCard: {
+    width: 120,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.base,
+    gap: 6,
     ...Shadows.sm,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  categoryCardActive: { borderColor: Colors.royalBlue, backgroundColor: Colors.blueBg },
-  categoryEmoji: { fontSize: 28 },
-  categoryLabel: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.textSecondary,
-    textAlign: 'center',
+  packageIconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  categoryLabelActive: { color: Colors.royalBlue },
-  deliveryBanner: { marginHorizontal: Spacing.base, marginTop: Spacing.md, borderRadius: BorderRadius.xl, overflow: 'hidden' },
-  deliveryGradient: { flexDirection: 'row', alignItems: 'center', gap: Spacing.base, padding: Spacing.base },
-  deliveryEmoji: { fontSize: 40 },
-  deliveryTitle: {
-    fontSize: Typography.fontSize.base,
+  packageEmoji: { fontSize: 24 },
+  packageLabel: {
+    fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.bold,
     color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
+    lineHeight: 18,
   },
-  deliveryBadges: { gap: 4 },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  badgeText: { fontSize: Typography.fontSize.xs, fontFamily: Typography.fontFamily.medium, color: Colors.textSecondary },
+  packageTests: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.textMuted,
+    lineHeight: 15,
+  },
+  packageArrow: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.blueBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Test Cards ──
   testCard: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
     padding: Spacing.base,
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
     ...Shadows.sm,
   },
-  testCardLeft: { flex: 1, marginRight: Spacing.sm },
-  testName: {
+  testCardIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.blueBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testCardEmoji: { fontSize: 22 },
+  testCardInfo: { flex: 1 },
+  testCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  testCardName: {
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.bold,
     color: Colors.textPrimary,
-    marginBottom: 4,
+    flex: 1,
   },
-  testIncludes: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-    lineHeight: Typography.fontSize.xs * 1.6,
-  },
-  testMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  metaTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: Colors.surface,
-    borderRadius: 4,
-  },
-  metaTagWarning: { backgroundColor: Colors.warningBg },
-  metaTagSuccess: { backgroundColor: Colors.successBg },
-  metaTagText: { fontSize: 9, fontFamily: Typography.fontFamily.medium, color: Colors.textSecondary },
-  testCardRight: { alignItems: 'flex-end', gap: Spacing.xs },
-  aiBadge: {
+  aiChip: {
     backgroundColor: Colors.blueBg,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  aiText: { fontSize: 10, fontFamily: Typography.fontFamily.semiBold, color: Colors.royalBlue },
-  priceBlock: { alignItems: 'flex-end' },
+  aiChipText: { fontSize: 9, fontFamily: Typography.fontFamily.semiBold, color: Colors.royalBlue },
+  testCardIncludes: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
+  testCardMeta: { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
+  metaTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: Colors.surface,
+    borderRadius: 4,
+  },
+  metaTagWarn: { backgroundColor: Colors.warningBg },
+  metaTagOk: { backgroundColor: Colors.successBg },
+  metaTagText: { fontSize: 9, fontFamily: Typography.fontFamily.medium, color: Colors.textSecondary },
+  testCardRight: { alignItems: 'flex-end', gap: Spacing.xs },
   originalPrice: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.textMuted,
     textDecorationLine: 'line-through',
@@ -345,33 +623,116 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: BorderRadius.full,
   },
-  bookBtnText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.semiBold,
-  },
+  bookBtnText: { color: Colors.white, fontSize: Typography.fontSize.xs, fontFamily: Typography.fontFamily.semiBold },
+
+  // ── Combo Offers ──
   comboCard: {
+    backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
+    padding: Spacing.base,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.base,
+    marginBottom: Spacing.sm,
+    ...Shadows.sm,
   },
-  comboEmoji: { fontSize: 40 },
+  comboIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  comboEmoji: { fontSize: 26 },
   comboInfo: { flex: 1 },
   comboTitle: {
-    fontSize: Typography.fontSize.xl,
+    fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.bold,
     color: Colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  comboSub: {
-    fontSize: Typography.fontSize.sm,
+  comboDesc: {
+    fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.textSecondary,
+    marginBottom: 6,
   },
-  privacySection: { padding: Spacing.xl, paddingHorizontal: Spacing['2xl'] },
+  comboPriceRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  comboPrice: {
+    fontSize: Typography.fontSize.lg,
+    fontFamily: Typography.fontFamily.bold,
+    color: Colors.textPrimary,
+  },
+  comboOriginal: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.textMuted,
+    textDecorationLine: 'line-through',
+  },
+  savingBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  savingText: { fontSize: 9, fontFamily: Typography.fontFamily.bold, letterSpacing: 0.5 },
+
+  // ── Accessible & Affordable ──
+  accessibleSection: {
+    marginHorizontal: Spacing.base,
+    marginTop: Spacing.xl,
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    ...Shadows.md,
+  },
+  accessibleGradient: {
+    flexDirection: 'row',
+    padding: Spacing.xl,
+    minHeight: 200,
+  },
+  accessibleLeft: { flex: 1, justifyContent: 'center' },
+  accessibleTitle: {
+    fontSize: Typography.fontSize['3xl'],
+    fontFamily: Typography.fontFamily.bold,
+    color: Colors.textPrimary,
+    lineHeight: 38,
+    marginBottom: Spacing.lg,
+  },
+  accessibleFeatures: { gap: Spacing.sm },
+  accessibleFeature: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  accessibleFeatureIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.sm,
+  },
+  accessibleFeatureText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.semiBold,
+    color: Colors.textSecondary,
+  },
+  accessibleRight: {
+    width: 110,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    position: 'relative',
+  },
+  accessibleIllustration: { fontSize: 60, position: 'absolute', bottom: 10, right: 0 },
+  accessibleIllustration2: { fontSize: 40, position: 'absolute', bottom: 5, right: 55 },
+  medicalItems: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  medicalItem: { fontSize: 18 },
+
+  // Privacy Footer
+  privacySection: {
+    padding: Spacing.xl,
+    marginTop: Spacing.xl,
+    paddingHorizontal: Spacing['2xl'],
+  },
   privacyMain: { fontSize: Typography.fontSize['2xl'], fontFamily: Typography.fontFamily.regular, color: Colors.textSecondary },
-  privacyDevanagari: { fontSize: Typography.fontSize['3xl'], fontFamily: Typography.fontFamily.bold, color: Colors.textPrimary },
+  privacyDevanagari: { fontSize: Typography.fontSize['3xl'], fontFamily: Typography.fontFamily.bold, color: Colors.textPrimary, lineHeight: 40 },
   privacyWith: { fontSize: Typography.fontSize['2xl'], fontFamily: Typography.fontFamily.medium, color: Colors.teal },
 });

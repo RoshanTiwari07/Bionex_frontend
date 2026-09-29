@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,15 +14,15 @@ import {
   MapPin,
   ChevronDown,
   ShoppingCart,
-  Activity,
   Footprints,
   Heart,
   Moon,
   Upload,
-  FlaskConical,
-  Shield,
-  Clock,
-  AlertCircle,
+  Watch,
+  Bluetooth,
+  Zap,
+  ChevronRight,
+  Plus,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -43,23 +42,19 @@ export function HomeScreen() {
 
   const firstName = user?.name?.split(' ')[0] ?? 'User';
 
-  const REMINDERS = [
+  const REMINDER_PREVIEW = [
     {
       id: 'rem-1',
       medicine: 'Pan-40',
       dosage: '40mg · After Meal',
       time: '9:00 AM Today',
-      status: 'UPCOMING' as const,
-      refillLeft: 5,
       priority: 'HIGH' as const,
     },
     {
       id: 'rem-2',
       medicine: 'Blood Test',
       dosage: 'City Lab · Fasting',
-      time: '8:00 AM · Tomorrow, 13 Jun',
-      status: 'UPCOMING' as const,
-      location: '42 Health St, Medical District',
+      time: '8:00 AM · Tomorrow',
       priority: 'LOW' as const,
     },
   ];
@@ -108,52 +103,61 @@ export function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={healthLoading} onRefresh={refetch} />}
       >
-        {/* ── Health Score + Wearable Card ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Synced with your OnePlus watch</Text>
-          <View style={styles.healthCard}>
-            {/* Score Ring */}
-            <View style={styles.scoreRingContainer}>
-              <View style={styles.scoreRing}>
-                <View style={styles.scoreInner}>
-                  {healthLoading ? (
-                    <ActivityIndicator color={Colors.royalBlue} />
-                  ) : (
-                    <>
-                      <Text style={styles.scoreNumber}>{healthData?.score.score ?? 79}</Text>
-                      <Text style={styles.scoreMax}>out of 100</Text>
-                    </>
-                  )}
+        {/* ── Wearable Connection Card ── */}
+        <TouchableOpacity
+          id="btn-wearable-card"
+          activeOpacity={0.88}
+          style={styles.wearableCard}
+          onPress={() => navigation.navigate('Wearable')}
+        >
+          <LinearGradient
+            colors={[Colors.royalBlue, '#4A7CFF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.wearableCardGradient}
+          >
+            {/* Left content */}
+            <View style={styles.wearableCardLeft}>
+              <View style={styles.wearableCardSync}>
+                <Bluetooth size={12} color={Colors.tealLight} strokeWidth={2.5} />
+                <Text style={styles.wearableCardSyncText}>Connected · Syncing</Text>
+              </View>
+              <Text style={styles.wearableCardTitle}>
+                Connect your wearables and View all health data in one place.
+              </Text>
+              <View style={styles.wearableCardMetrics}>
+                <View style={styles.wearableMetric}>
+                  <Footprints size={12} color="rgba(255,255,255,0.8)" strokeWidth={2} />
+                  <Text style={styles.wearableMetricText}>
+                    {(healthData?.steps.value ?? 5000).toLocaleString()}
+                  </Text>
+                </View>
+                <View style={styles.wearableMetric}>
+                  <Heart size={12} color="rgba(255,255,255,0.8)" strokeWidth={2} />
+                  <Text style={styles.wearableMetricText}>
+                    {healthData?.heartRate.value ?? 89} BPM
+                  </Text>
+                </View>
+                <View style={styles.wearableMetric}>
+                  <Moon size={12} color="rgba(255,255,255,0.8)" strokeWidth={2} />
+                  <Text style={styles.wearableMetricText}>
+                    {healthData?.sleep.value ?? 9}hr
+                  </Text>
                 </View>
               </View>
-            </View>
-
-            {/* Metric Pills */}
-            <View style={styles.metricRow}>
-              <View style={[styles.metricPill, { backgroundColor: Colors.tealBg }]}>
-                <Footprints size={16} color={Colors.teal} strokeWidth={2} />
-                <Text style={[styles.metricValue, { color: Colors.tealDark }]}>
-                  {healthData?.steps.value.toLocaleString() ?? '5,000'}
-                </Text>
-                <Text style={styles.metricUnit}>Steps</Text>
-              </View>
-              <View style={[styles.metricPill, { backgroundColor: '#FFF0F0' }]}>
-                <Heart size={16} color={Colors.error} strokeWidth={2} />
-                <Text style={[styles.metricValue, { color: Colors.error }]}>
-                  {healthData?.heartRate.value ?? 89}
-                </Text>
-                <Text style={styles.metricUnit}>BPM</Text>
-              </View>
-              <View style={[styles.metricPill, { backgroundColor: Colors.blueBg }]}>
-                <Moon size={16} color={Colors.royalBlue} strokeWidth={2} />
-                <Text style={[styles.metricValue, { color: Colors.royalBlue }]}>
-                  {healthData?.sleep.value ?? 9}hr
-                </Text>
-                <Text style={styles.metricUnit}>Sleep</Text>
+              <View style={styles.wearableCardBtn}>
+                <Text style={styles.wearableCardBtnText}>View Health Data</Text>
+                <ChevronRight size={14} color={Colors.royalBlue} strokeWidth={2.5} />
               </View>
             </View>
-          </View>
-        </View>
+            {/* Watch icon right */}
+            <View style={styles.wearableCardRight}>
+              <View style={styles.wearableWatchRing}>
+                <Watch size={36} color={Colors.royalBlue} strokeWidth={1.5} />
+              </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* ── Action Banners ── */}
         <View style={styles.section}>
@@ -225,91 +229,91 @@ export function HomeScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* ── Smart Reminders ── */}
+        {/* ── Smart Reminders Card ── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Smart Reminders</Text>
-            <TouchableOpacity id="btn-view-all-reminders">
+            <TouchableOpacity
+              id="btn-view-all-reminders"
+              onPress={() => navigation.navigate('SmartReminders')}
+            >
               <Text style={styles.viewAllText}>View All →</Text>
             </TouchableOpacity>
           </View>
 
-          {REMINDERS.map((reminder) => (
-            <View key={reminder.id} style={styles.reminderCard}>
-              <View style={styles.reminderLeft}>
-                <Text style={styles.reminderMed}>{reminder.medicine}</Text>
-                <Text style={styles.reminderDosage}>{reminder.dosage}</Text>
-                <View style={styles.reminderTimeRow}>
-                  <Clock size={12} color={Colors.textMuted} strokeWidth={2} />
-                  <Text style={styles.reminderTime}>{reminder.time}</Text>
-                </View>
-                {reminder.refillLeft !== undefined && (
-                  <View style={styles.refillBadge}>
-                    <Text style={styles.refillText}>REFILL NEEDED ({reminder.refillLeft} LEFT)</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.reminderRight}>
-                <View style={[
-                  styles.statusBadge,
-                  reminder.priority === 'HIGH' ? styles.statusHigh : styles.statusRoutine,
-                ]}>
-                  <Text style={[
-                    styles.statusText,
-                    reminder.priority === 'HIGH' ? { color: Colors.error } : { color: Colors.royalBlue },
-                  ]}>
-                    {reminder.priority === 'HIGH' ? 'HIGH PRIORITY' : 'ROUTINE'}
-                  </Text>
-                </View>
-                <View style={[
-                  styles.reminderStatusBadge,
-                  { backgroundColor: Colors.blueBg },
-                ]}>
-                  <Text style={[styles.reminderStatusText, { color: Colors.royalBlue }]}>
-                    Upcoming
-                  </Text>
-                </View>
-                {reminder.refillLeft !== undefined && (
-                  <TouchableOpacity id={`btn-order-now-${reminder.id}`} style={styles.orderNowBtn}>
-                    <Text style={styles.orderNowText}>Order Now →</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* ── Family Monitoring ── */}
-        <View style={[styles.section, styles.familySection]}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Family Monitoring</Text>
-            <TouchableOpacity id="btn-family-settings">
-              <Text style={styles.viewAllText}>⚙️</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.familyCard}>
-            <View style={styles.familyAvatar}>
-              <Text style={styles.familyAvatarEmoji}>👴</Text>
-            </View>
-            <View style={styles.familyInfo}>
-              <Text style={styles.familyName}>Grandpa Joe</Text>
-              <Text style={styles.familyAlert}>MISSED MORNING MEDICINES</Text>
-            </View>
-            <View style={styles.escalationBadge}>
-              <AlertCircle size={12} color={Colors.error} strokeWidth={2} />
-              <Text style={styles.escalationText}>ESCALATION ACTIVE</Text>
-            </View>
-          </View>
-          <TouchableOpacity id="btn-notify-caregiver" style={styles.notifyCaregiverBtn}>
+          <TouchableOpacity
+            id="btn-reminders-card"
+            activeOpacity={0.88}
+            style={styles.remindersCard}
+            onPress={() => navigation.navigate('SmartReminders')}
+          >
+            {/* AI banner row */}
             <LinearGradient
-              colors={[Colors.error, '#C0392B']}
+              colors={[Colors.royalBlue, '#4A7CFF']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.notifyCaregiverGradient}
+              style={styles.reminderAiBanner}
             >
-              <Bell size={16} color={Colors.white} strokeWidth={2} />
-              <Text style={styles.notifyCaregiverText}>Notify Caregiver</Text>
+              <Zap size={12} color={Colors.orange} strokeWidth={2} />
+              <Text style={styles.reminderAiText}>AI Optimization Active · Reminders adjusted</Text>
             </LinearGradient>
+
+            {/* Preview items */}
+            {REMINDER_PREVIEW.map((item, idx) => (
+              <View
+                key={item.id}
+                style={[
+                  styles.reminderPreviewRow,
+                  idx < REMINDER_PREVIEW.length - 1 && styles.reminderPreviewDivider,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.reminderDot,
+                    { backgroundColor: item.priority === 'HIGH' ? Colors.error : Colors.royalBlue },
+                  ]}
+                />
+                <View style={styles.reminderPreviewInfo}>
+                  <Text style={styles.reminderPreviewMed}>{item.medicine}</Text>
+                  <Text style={styles.reminderPreviewDose}>{item.dosage}</Text>
+                </View>
+                <View style={styles.reminderPreviewRight}>
+                  <View
+                    style={[
+                      styles.reminderPriorityBadge,
+                      {
+                        backgroundColor:
+                          item.priority === 'HIGH' ? Colors.errorBg : Colors.blueBg,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.reminderPriorityText,
+                        {
+                          color:
+                            item.priority === 'HIGH' ? Colors.error : Colors.royalBlue,
+                        },
+                      ]}
+                    >
+                      {item.priority === 'HIGH' ? 'HIGH' : 'ROUTINE'}
+                    </Text>
+                  </View>
+                  <Text style={styles.reminderPreviewTime}>{item.time}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Manage button */}
+            <TouchableOpacity
+              id="btn-manage-reminders"
+              style={styles.manageRemindersBtn}
+              onPress={() => navigation.navigate('SmartReminders')}
+            >
+              <Plus size={14} color={Colors.teal} strokeWidth={2.5} />
+              <Text style={styles.manageRemindersBtnText}>Manage & Add Reminders</Text>
+              <ChevronRight size={14} color={Colors.teal} strokeWidth={2.5} />
+            </TouchableOpacity>
           </TouchableOpacity>
         </View>
 
@@ -402,51 +406,85 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.semiBold,
     color: Colors.royalBlue,
   },
-  // Health Card
-  healthCard: {
-    backgroundColor: Colors.white,
+  // Wearable Card
+  wearableCard: {
+    marginHorizontal: Spacing.base,
+    marginTop: Spacing.xl,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
+    overflow: 'hidden',
     ...Shadows.md,
   },
-  scoreRingContainer: { alignItems: 'center', marginBottom: Spacing.base },
-  scoreRing: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 12,
-    borderColor: Colors.teal,
+  wearableCardGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.xl,
+    minHeight: 180,
+  },
+  wearableCardLeft: { flex: 1, gap: Spacing.sm },
+  wearableCardSync: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+    alignSelf: 'flex-start',
+  },
+  wearableCardSyncText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  wearableCardTitle: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.bold,
+    color: Colors.white,
+    lineHeight: 22,
+    marginVertical: Spacing.xs,
+  },
+  wearableCardMetrics: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    flexWrap: 'wrap',
+  },
+  wearableMetric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  wearableMetricText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.semiBold,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  wearableCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    alignSelf: 'flex-start',
+    marginTop: Spacing.xs,
+  },
+  wearableCardBtnText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.bold,
+    color: Colors.royalBlue,
+  },
+  wearableCardRight: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.tealBg,
+    paddingLeft: Spacing.md,
   },
-  scoreInner: { alignItems: 'center' },
-  scoreNumber: {
-    fontSize: Typography.fontSize['5xl'],
-    fontFamily: Typography.fontFamily.extraBold,
-    color: Colors.textPrimary,
-  },
-  scoreMax: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.textMuted,
-  },
-  metricRow: { flexDirection: 'row', gap: Spacing.sm },
-  metricPill: {
-    flex: 1,
+  wearableWatchRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
     alignItems: 'center',
-    gap: 3,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-  },
-  metricValue: {
-    fontSize: Typography.fontSize.xl,
-    fontFamily: Typography.fontFamily.bold,
-  },
-  metricUnit: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.textMuted,
+    justifyContent: 'center',
   },
   // Action Banners
   bannerRow: { flexDirection: 'row', gap: Spacing.sm },
@@ -541,119 +579,82 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
   },
   darkCardEmoji: { fontSize: 60 },
-  // Reminders
-  reminderCard: {
+  // Reminder preview card
+  remindersCard: {
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    marginBottom: Spacing.sm,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    ...Shadows.sm,
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    ...Shadows.md,
   },
-  reminderLeft: { flex: 1 },
-  reminderMed: {
-    fontSize: Typography.fontSize.lg,
+  reminderAiBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 8,
+  },
+  reminderAiText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.semiBold,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  reminderPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  reminderPreviewDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  reminderDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  reminderPreviewInfo: { flex: 1 },
+  reminderPreviewMed: {
+    fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.bold,
     color: Colors.textPrimary,
-    marginBottom: 2,
   },
-  reminderDosage: {
-    fontSize: Typography.fontSize.sm,
+  reminderPreviewDose: {
+    fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.textSecondary,
-    marginBottom: 4,
   },
-  reminderTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  reminderTime: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.textMuted,
-  },
-  refillBadge: {
-    marginTop: 6,
-    backgroundColor: Colors.errorBg,
+  reminderPreviewRight: { alignItems: 'flex-end', gap: 3 },
+  reminderPriorityBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-    alignSelf: 'flex-start',
   },
-  refillText: {
+  reminderPriorityText: {
     fontSize: 9,
     fontFamily: Typography.fontFamily.bold,
-    color: Colors.error,
     letterSpacing: 0.5,
   },
-  reminderRight: { alignItems: 'flex-end', gap: Spacing.xs },
-  statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  statusHigh: { backgroundColor: Colors.errorBg },
-  statusRoutine: { backgroundColor: Colors.blueBg },
-  statusText: { fontSize: 9, fontFamily: Typography.fontFamily.bold, letterSpacing: 0.5 },
-  reminderStatusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.full,
-  },
-  reminderStatusText: { fontSize: Typography.fontSize.xs, fontFamily: Typography.fontFamily.semiBold },
-  orderNowBtn: { backgroundColor: Colors.tealBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: BorderRadius.full },
-  orderNowText: { fontSize: Typography.fontSize.xs, fontFamily: Typography.fontFamily.semiBold, color: Colors.teal },
-  // Family
-  familySection: { marginBottom: Spacing.base },
-  familyCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
-  },
-  familyAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.orangeBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  familyAvatarEmoji: { fontSize: 22 },
-  familyInfo: { flex: 1 },
-  familyName: {
-    fontSize: Typography.fontSize.base,
-    fontFamily: Typography.fontFamily.semiBold,
-    color: Colors.textPrimary,
-  },
-  familyAlert: {
+  reminderPreviewTime: {
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.medium,
     color: Colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  escalationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: Colors.errorBg,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  escalationText: { fontSize: 9, fontFamily: Typography.fontFamily.bold, color: Colors.error, letterSpacing: 0.5 },
-  notifyCaregiverBtn: { borderRadius: BorderRadius.full, overflow: 'hidden' },
-  notifyCaregiverGradient: {
+  manageRemindersBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    gap: 6,
     paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    marginTop: Spacing.xs,
   },
-  notifyCaregiverText: {
-    color: Colors.white,
-    fontSize: Typography.fontSize.base,
+  manageRemindersBtnText: {
+    fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.semiBold,
+    color: Colors.teal,
   },
   // Privacy
   privacySection: {

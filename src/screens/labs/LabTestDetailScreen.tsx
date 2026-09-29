@@ -39,37 +39,59 @@ export function LabTestDetailScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Test Hero */}
-        <LinearGradient colors={[Colors.blueBg, Colors.tealBg]} style={styles.testHero}>
+        {/* Test Hero Image Area */}
+        <LinearGradient colors={[Colors.blueBg, Colors.tealBg]} style={styles.testHeroImage}>
           <Text style={styles.testHeroEmoji}>🔬</Text>
-          <View style={styles.testHeroInfo}>
-            <Text style={styles.testHeroName}>{test.name}</Text>
-            <Text style={styles.testHeroDesc}>{test.description}</Text>
-            <View style={styles.testHeroMeta}>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaChipLabel}>FASTING</Text>
-                <Text style={[styles.metaChipValue, { color: test.fasting ? Colors.error : Colors.success }]}>
-                  {test.fasting ? 'YES' : 'NO'}
-                </Text>
-              </View>
-              <View style={styles.metaChip}>
-                <Text style={styles.metaChipLabel}>SAMPLE</Text>
-                <Text style={styles.metaChipValue}>{test.sampleType}</Text>
-              </View>
-              <View style={[styles.labBadge]}>
-                <Text style={styles.labBadgeText}>Tata 1mg{'\n'}lab</Text>
-              </View>
+          {test.aiPowered && (
+            <View style={styles.aiPoweredBadge}>
+              <Bot size={12} color={Colors.white} strokeWidth={2} />
+              <Text style={styles.aiPoweredText}>AI Powered</Text>
             </View>
-          </View>
+          )}
         </LinearGradient>
 
-        {/* Description */}
+        {/* Test Info Card */}
+        <View style={styles.testInfoCard}>
+          <Text style={styles.testInfoName}>{test.name}</Text>
+          <Text style={styles.testInfoDesc}>{test.description}</Text>
+          <View style={styles.testInfoMeta}>
+            <View style={styles.metaBlock}>
+              <Text style={styles.metaBlockLabel}>FASTING</Text>
+              <Text style={[styles.metaBlockValue, { color: test.fasting ? Colors.error : Colors.success }]}>
+                {test.fasting ? 'YES' : 'NO'}
+              </Text>
+            </View>
+            <View style={styles.metaDivider} />
+            <View style={styles.metaBlock}>
+              <Text style={styles.metaBlockLabel}>SAMPLE</Text>
+              <Text style={styles.metaBlockValue}>{test.sampleType}</Text>
+            </View>
+            <View style={styles.metaDivider} />
+            <View style={[styles.metaBlock, styles.metaBlockLab]}>
+              <Text style={styles.labPartnerName}>{'Tata 1mg\nlab'}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Description 1 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Description</Text>
           <Text style={styles.descriptionText}>
             {test.description} This test measures important blood parameters and is used to assess
-            overall health and detect a wide range of disorders. Recommended annually for
-            preventive care monitoring.
+            overall health and detect a wide range of disorders. Dolo-650 Tablet is used to reduce
+            fever and treat mild to moderate pain. Also, it is used to relieve headaches, migraines,
+            toothaches, period pain, back pain, muscle pain, and rheumatic pains. It contains
+            Paracetamol, which works by inhibiting the product...
+          </Text>
+        </View>
+
+        {/* Description 2 (extended) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Description</Text>
+          <Text style={styles.descriptionText}>
+            Dolo-650 Tablet is used to reduce fever and treat mild to moderate pain. Also, it is
+            used to relieve headaches, migraines, toothaches, period pain, back pain, muscle pain,
+            and rheumatic pains. It contains Paracetamol, which works by inhibiting the product...
           </Text>
         </View>
 
@@ -88,31 +110,50 @@ export function LabTestDetailScreen() {
           </View>
         )}
 
-        {/* AI Powered Reports Banner */}
+        {/* AI Powered Reports Banner - Orange style matching Figma */}
         <LinearGradient
-          colors={['#EEF3FF', '#EAF8F4']}
+          colors={['#FF7243', '#D94F22']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={styles.aiBanner}
         >
           <View style={styles.aiBannerLeft}>
             <View style={styles.aiBadge}>
-              <Bot size={16} color={Colors.royalBlue} strokeWidth={2} />
-              <Text style={styles.aiBadgeText}>AI Powered Reports</Text>
+              <Bot size={14} color={Colors.orange} strokeWidth={2} />
+              <Text style={styles.aiBadgeText}>AI Reports</Text>
             </View>
-            <Text style={styles.aiBannerTitle}>Get AI Powered Reports with Bionex</Text>
+            <Text style={styles.aiBannerTitle}>{'AI Powered\nReports'}</Text>
             <Text style={styles.aiBannerSub}>
-              Accurate reports and every step of the way
+              We ensure a quality and care of every vital
             </Text>
             <View style={styles.aiBannerFeatures}>
-              {['Accurate Analysis', 'Personalized Insights', 'Quick & Easy'].map((f) => (
+              {['Insight, just for you', 'Lots of happy users'].map((f) => (
                 <View key={f} style={styles.aiFeature}>
                   <Text style={styles.aiFeatureEmoji}>✅</Text>
-                  <Text style={styles.aiFeatureText}>{f}</Text>
+                  <Text style={[styles.aiFeatureText, { color: 'rgba(255,255,255,0.9)' }]}>{f}</Text>
                 </View>
               ))}
             </View>
+            <TouchableOpacity id="btn-ai-chat" style={styles.chatBtn}>
+              <Text style={styles.chatBtnText}>💬 Let's Chat</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.aiRobotEmoji}>🤖</Text>
         </LinearGradient>
+
+        {/* AI Powered Reports — bottom strip */}
+        <View style={styles.aiBannerStrip}>
+          <Text style={styles.aiBannerStripTitle}>Get AI Powered Reports with Bionex</Text>
+          <Text style={styles.aiBannerStripSub}>Bionex offers document-ready insights from your health data</Text>
+          <View style={styles.aiBannerStripFeatures}>
+            {['Accurate Analysis', 'Personalized Insights', 'Quick & Easy'].map((f) => (
+              <View key={f} style={styles.aiBannerStripFeature}>
+                <Text style={styles.aiBannerStripFeatureEmoji}>✅</Text>
+                <Text style={styles.aiBannerStripFeatureText}>{f}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
 
         {/* Lab Partners */}
         <View style={styles.section}>
@@ -207,58 +248,82 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   scrollContent: { paddingBottom: 100 },
-  testHero: {
-    flexDirection: 'row',
-    padding: Spacing.base,
-    gap: Spacing.base,
-    margin: Spacing.base,
-    borderRadius: BorderRadius.xl,
+  // Hero image (full-width illustration area)
+  testHeroImage: {
+    height: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
-  testHeroEmoji: { fontSize: 50 },
-  testHeroInfo: { flex: 1 },
-  testHeroName: {
+  testHeroEmoji: { fontSize: 72 },
+  aiPoweredBadge: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.base,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.royalBlue,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  aiPoweredText: { fontSize: 10, fontFamily: Typography.fontFamily.semiBold, color: Colors.white },
+  // Test Info Card
+  testInfoCard: {
+    backgroundColor: Colors.white,
+    marginHorizontal: Spacing.base,
+    marginTop: -20,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.base,
+    ...Shadows.md,
+    marginBottom: Spacing.sm,
+  },
+  testInfoName: {
     fontSize: Typography.fontSize.xl,
     fontFamily: Typography.fontFamily.bold,
     color: Colors.textPrimary,
     marginBottom: 4,
   },
-  testHeroDesc: {
+  testInfoDesc: {
     fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
     lineHeight: Typography.fontSize.sm * 1.6,
+    marginBottom: Spacing.base,
   },
-  testHeroMeta: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
-  metaChip: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
+  testInfoMeta: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
   },
-  metaChipLabel: {
+  metaBlock: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  metaBlockLab: { backgroundColor: Colors.blueBg },
+  metaBlockLabel: {
     fontSize: 9,
     fontFamily: Typography.fontFamily.bold,
     color: Colors.textMuted,
     letterSpacing: 0.5,
+    marginBottom: 2,
   },
-  metaChipValue: {
+  metaBlockValue: {
     fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.bold,
     color: Colors.textPrimary,
   },
-  labBadge: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-  },
-  labBadgeText: {
-    fontSize: 9,
-    fontFamily: Typography.fontFamily.semiBold,
+  metaDivider: { width: 1, height: 36, backgroundColor: Colors.border },
+  labPartnerName: {
+    fontSize: 10,
+    fontFamily: Typography.fontFamily.bold,
     color: Colors.royalBlue,
     textAlign: 'center',
+    lineHeight: 14,
   },
   section: { paddingHorizontal: Spacing.base, marginBottom: Spacing.lg },
   sectionTitle: {
@@ -302,7 +367,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: Colors.white,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     paddingHorizontal: Spacing.sm,
     paddingVertical: 3,
     borderRadius: BorderRadius.full,
@@ -312,29 +377,56 @@ const styles = StyleSheet.create({
   aiBadgeText: {
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.semiBold,
-    color: Colors.royalBlue,
+    color: Colors.white,
   },
   aiBannerTitle: {
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.xl,
     fontFamily: Typography.fontFamily.bold,
-    color: Colors.textPrimary,
+    color: Colors.white,
     marginBottom: 4,
+    lineHeight: 26,
   },
   aiBannerSub: {
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.textSecondary,
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: Spacing.sm,
   },
-  aiBannerFeatures: { gap: 3 },
+  aiBannerFeatures: { gap: 3, marginBottom: Spacing.sm },
   aiFeature: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   aiFeatureEmoji: { fontSize: 10 },
   aiFeatureText: {
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.medium,
-    color: Colors.textSecondary,
+    color: 'rgba(255,255,255,0.9)',
   },
+  chatBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  chatBtnText: { fontSize: Typography.fontSize.sm, fontFamily: Typography.fontFamily.semiBold, color: Colors.white },
   aiRobotEmoji: { fontSize: 60 },
+  // AI bottom strip
+  aiBannerStrip: {
+    backgroundColor: Colors.blueBg,
+    marginHorizontal: Spacing.base,
+    marginBottom: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.base,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  aiBannerStripTitle: { fontSize: Typography.fontSize.base, fontFamily: Typography.fontFamily.bold, color: Colors.royalBlue, marginBottom: 4 },
+  aiBannerStripSub: { fontSize: Typography.fontSize.xs, fontFamily: Typography.fontFamily.regular, color: Colors.textSecondary, marginBottom: Spacing.sm },
+  aiBannerStripFeatures: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
+  aiBannerStripFeature: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  aiBannerStripFeatureEmoji: { fontSize: 10 },
+  aiBannerStripFeatureText: { fontSize: Typography.fontSize.xs, fontFamily: Typography.fontFamily.medium, color: Colors.textSecondary },
   labCard: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
