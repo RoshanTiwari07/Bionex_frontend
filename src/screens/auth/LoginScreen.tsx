@@ -13,65 +13,117 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight, Phone, CreditCard } from 'lucide-react-native';
+import { ArrowRight, Lock } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
-import { useRequestPhoneOtp, useRequestAbhaOtp } from '../../api/authApi';
+import { useLogin } from '../../api/authApi';
+import { useAuthStore } from '../../store/authStore';
 import type { AuthStackParamList } from '../../navigation/AuthStack';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
-type LoginMode = 'phone' | 'abha';
+// ─── Password Validation ─────────────────────────────────────────────────────
+interface PasswordStrength {
+  score: number; // 0-4
+  hasLength: boolean;
+  hasUppercase: boolean;
+  hasLowercase: boolean;
+  hasDigit: boolean;
+  hasSpecial: boolean;
+}
+
+function validatePassword(password: string): PasswordStrength {
+  const strength: PasswordStrength = {
+    score: 0,
+    hasLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasDigit: /\d/.test(password),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  };
+
+  strength.score = [
+    strength.hasLength,
+    strength.hasUppercase,
+    strength.hasLowercase,
+    strength.hasDigit,
+    strength.hasSpecial,
+  ].filter(Boolean).length;
+
+  return strength;
+}
+
+// ─── Phone Validation ────────────────────────────────────────────────────────
+function validatePhone(phone: string): boolean {
+  // E.164 format: +91XXXXXXXXXX (10 digits after +91)
+  // We accept 10-digit input and auto-prefix with +91
+  return /^\d{10}$/.test(phone);
+}
 
 export function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const [mode, setMode] = useState<LoginMode>('phone');
-
-  const requestPhoneOtp = useRequestPhoneOtp();
-  const requestAbhaOtp = useRequestAbhaOtp();
+  const { setUser, setRequires2fa } = useAuthStore();
+  const login = useLogin();
 
   const [phoneValue, setPhoneValue] = useState('');
-  const [abhaValue, setAbhaValue] = useState('');
+  const [passwordValue, setPasswordValue] = useState('');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handlePhoneSubmit = async () => {
+  const passwordStrength = validatePassword(passwordValue);
+  const isPhoneValid = phoneValue.length === 0 || validatePhone(phoneValue);
+  const isPasswordValid = passwordValue.length >= 8 && passwordStrength.score >= 4;
+  const canSubmit = validatePhone(phoneValue) && isPasswordValid && !login.isPending;
+
+  const handleLogin = async () => {
     setError('');
-    if (phoneValue.length !== 10 || !/^\d+$/.test(phoneValue)) {
+
+    // Validate inputs
+    if (!validatePhone(phoneValue)) {
       setError('Please enter a valid 10-digit mobile number.');
       return;
     }
-    try {
-      const result = await requestPhoneOtp.mutateAsync({ phone: `+91${phoneValue}` });
-      navigation.navigate('Otp', {
-        phone: `+91${phoneValue}`,
-        txnId: result.txnId,
-        mode: 'phone',
-      });
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to send OTP.');
-    }
-  };
 
-  const handleAbhaSubmit = async () => {
-    setError('');
-    if (!abhaValue.trim()) {
-      setError('Please enter your ABHA ID.');
+    if (!isPasswordValid) {
+      setError('Password must meet all requirements.');
       return;
     }
+
     try {
-      const result = await requestAbhaOtp.mutateAsync({ abhaId: abhaValue.trim() });
-      navigation.navigate('Otp', {
-        abhaId: abhaValue.trim(),
-        txnId: result.txnId,
-        mode: 'abha',
+      const result = await login.mutateAsync({
+        phone: `+91${phoneValue}`,
+        password: passwordValue,
       });
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to send OTP.');
+
+      // Store user data
+      setUser(result.user);
+
+      // Handle 2FA if required
+      if (result.requires2fa) {
+        setRequires2fa(true);
+        // TODO: Navigate to 2FA screen when available
+        Alert.alert('2FA Required', 'Two-factor authentication setup required.');
+        return;
+      }
+
+      // Success - user will be navigated by auth state change in App.tsx
+    } catch (err: any) {
+      if (err.code === 'ACCOUNT_LOCKED') {
+        setError('Account locked due to too many failed attempts. Try again later.');
+      } else if (err.statusCode === 429) {
+        setError('Too many login attempts. Please try again later.');
+      } else {
+        setError(err.message || 'Login failed. Please check your credentials.');
+      }
     }
   };
 
-  const isLoading = requestPhoneOtp.isPending || requestAbhaOtp.isPending;
+  const handleRegisterPress = () => {
+    navigation.navigate('Register');
+  };
+
+  const isLoading = login.isPending;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -101,82 +153,110 @@ export function LoginScreen() {
             <Text style={styles.cardTitle}>Welcome Back</Text>
             <Text style={styles.cardSubtitle}>Sign in to access your health records</Text>
 
-            {/* Mode Toggle */}
-            <View style={styles.modeToggle}>
-              <TouchableOpacity
-                id="btn-phone-mode"
-                onPress={() => { setMode('phone'); setError(''); }}
-                style={[styles.modeBtn, mode === 'phone' && styles.modeBtnActive]}
-              >
-                <Phone size={15} color={mode === 'phone' ? Colors.royalBlue : Colors.textMuted} strokeWidth={2} />
-                <Text style={[styles.modeBtnText, mode === 'phone' && styles.modeBtnTextActive]}>
-                  Mobile Number
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                id="btn-abha-mode"
-                onPress={() => { setMode('abha'); setError(''); }}
-                style={[styles.modeBtn, mode === 'abha' && styles.modeBtnActive]}
-              >
-                <CreditCard size={15} color={mode === 'abha' ? Colors.royalBlue : Colors.textMuted} strokeWidth={2} />
-                <Text style={[styles.modeBtnText, mode === 'abha' && styles.modeBtnTextActive]}>
-                  ABHA ID
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Form */}
-            {mode === 'phone' ? (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Mobile Number</Text>
-                <View style={styles.phoneRow}>
-                  <View style={styles.countryCode}>
-                    <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
-                  </View>
-                  <TextInput
-                    id="input-phone"
-                    style={styles.phoneInput}
-                    placeholder="Enter 10-digit number"
-                    placeholderTextColor={Colors.textMuted}
-                    keyboardType="phone-pad"
-                    maxLength={10}
-                    value={phoneValue}
-                    onChangeText={setPhoneValue}
-                  />
+            {/* Phone Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Mobile Number</Text>
+              <View style={styles.phoneRow}>
+                <View style={styles.countryCode}>
+                  <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
                 </View>
-              </View>
-            ) : (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>ABHA ID / Address</Text>
                 <TextInput
-                  id="input-abha"
-                  style={styles.textInput}
-                  placeholder="Enter ABHA ID (xx-xxxx-xxxx-xxxx)"
+                  id="input-phone"
+                  style={styles.phoneInput}
+                  placeholder="Enter 10-digit number"
                   placeholderTextColor={Colors.textMuted}
-                  autoCapitalize="none"
-                  value={abhaValue}
-                  onChangeText={setAbhaValue}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  value={phoneValue}
+                  onChangeText={setPhoneValue}
+                  editable={!isLoading}
                 />
               </View>
-            )}
+              {!isPhoneValid && phoneValue.length > 0 && (
+                <Text style={styles.fieldError}>Invalid phone number</Text>
+              )}
+            </View>
 
-            {/* Error */}
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <View style={styles.passwordLabelRow}>
+                <Text style={styles.inputLabel}>Password</Text>
+                {passwordValue.length > 0 && (
+                  <Text style={styles.strengthLabel}>
+                    Strength: <Text style={_getStrengthColor(passwordStrength.score)}>{_getStrengthLabel(passwordStrength.score)}</Text>
+                  </Text>
+                )}
+              </View>
+              <View style={styles.passwordInputRow}>
+                <TextInput
+                  id="input-password"
+                  style={styles.passwordInput}
+                  placeholder="Enter password"
+                  placeholderTextColor={Colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  value={passwordValue}
+                  onChangeText={setPasswordValue}
+                  editable={!isLoading}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.passwordToggle}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.passwordToggleText}>
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Password Requirements */}
+              {passwordValue.length > 0 && (
+                <View style={styles.requirementsList}>
+                  <RequirementItem
+                    met={passwordStrength.hasLength}
+                    label="At least 8 characters"
+                  />
+                  <RequirementItem
+                    met={passwordStrength.hasUppercase}
+                    label="One uppercase letter"
+                  />
+                  <RequirementItem
+                    met={passwordStrength.hasLowercase}
+                    label="One lowercase letter"
+                  />
+                  <RequirementItem
+                    met={passwordStrength.hasDigit}
+                    label="One number"
+                  />
+                  <RequirementItem
+                    met={passwordStrength.hasSpecial}
+                    label="One special character (!@#$...)"
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Error Banner */}
             {!!error && (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
-            {/* Submit */}
+            {/* Submit Button */}
             <TouchableOpacity
-              id="btn-send-otp"
-              onPress={mode === 'phone' ? handlePhoneSubmit : handleAbhaSubmit}
-              disabled={isLoading}
+              id="btn-login"
+              onPress={handleLogin}
+              disabled={!canSubmit}
               activeOpacity={0.85}
               style={styles.submitBtn}
             >
               <LinearGradient
-                colors={[Colors.royalBlue, Colors.royalBlueDark]}
+                colors={
+                  canSubmit
+                    ? [Colors.royalBlue, Colors.royalBlueDark]
+                    : [Colors.textMuted, Colors.textMuted]
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.submitGradient}
@@ -185,12 +265,20 @@ export function LoginScreen() {
                   <ActivityIndicator color={Colors.white} size="small" />
                 ) : (
                   <>
-                    <Text style={styles.submitText}>Send OTP</Text>
+                    <Text style={styles.submitText}>Sign In</Text>
                     <ArrowRight color={Colors.white} size={18} strokeWidth={2.5} />
                   </>
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+            {/* Register Link */}
+            <View style={styles.registerRow}>
+              <Text style={styles.registerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={handleRegisterPress} disabled={isLoading}>
+                <Text style={styles.registerLink}>Sign Up</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Terms */}
             <Text style={styles.terms}>
@@ -198,10 +286,11 @@ export function LoginScreen() {
               <Text style={styles.termsLink}>Terms & Privacy Policy</Text>
             </Text>
 
-            {/* ABHA badge */}
-            <View style={styles.abhaInfo}>
-              <Text style={styles.abhaInfoText}>
-                🏥 ABHA Integrated · 🔒 HIPAA Compliant · 🛡️ End-to-End Encrypted
+            {/* Security Badge */}
+            <View style={styles.securityBadge}>
+              <Lock size={14} color={Colors.tealDark} strokeWidth={2} />
+              <Text style={styles.securityBadgeText}>
+                🔒 HIPAA Compliant · 🛡️ End-to-End Encrypted
               </Text>
             </View>
           </View>
@@ -210,6 +299,35 @@ export function LoginScreen() {
     </SafeAreaView>
   );
 }
+
+// ─── Helper Components ──────────────────────────────────────────────────────
+
+function RequirementItem({ met, label }: { met: boolean; label: string }) {
+  return (
+    <View style={styles.requirementItem}>
+      <Text style={styles.requirementIcon}>{met ? '✅' : '⭕'}</Text>
+      <Text style={[styles.requirementLabel, !met && styles.requirementLabelUnmet]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function _getStrengthLabel(score: number): string {
+  if (score < 2) return 'Weak';
+  if (score < 4) return 'Fair';
+  if (score < 5) return 'Good';
+  return 'Strong';
+}
+
+function _getStrengthColor(score: number) {
+  if (score < 2) return styles.strengthWeak;
+  if (score < 4) return styles.strengthFair;
+  if (score < 5) return styles.strengthGood;
+  return styles.strengthStrong;
+}
+
+// ─── Styles ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
@@ -253,31 +371,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: Spacing.xl,
   },
-  modeToggle: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: 4,
-    marginBottom: Spacing.xl,
-    gap: 4,
-  },
-  modeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-  },
-  modeBtnActive: { backgroundColor: Colors.white, ...Shadows.sm },
-  modeBtnText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.textMuted,
-  },
-  modeBtnTextActive: { color: Colors.royalBlue },
-  inputGroup: { marginBottom: Spacing.base },
+  inputGroup: { marginBottom: Spacing.lg },
   inputLabel: {
     fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.semiBold,
@@ -286,6 +380,21 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  passwordLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  strengthLabel: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.textMuted,
+  },
+  strengthWeak: { color: Colors.error },
+  strengthFair: { color: '#F59E0B' },
+  strengthGood: { color: '#10B981' },
+  strengthStrong: { color: Colors.success },
   phoneRow: {
     flexDirection: 'row',
     borderWidth: 1.5,
@@ -315,15 +424,55 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.medium,
     color: Colors.textPrimary,
   },
-  textInput: {
+  fieldError: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.error,
+    marginTop: 4,
+    fontFamily: Typography.fontFamily.medium,
+  },
+  passwordInputRow: {
+    flexDirection: 'row',
     borderWidth: 1.5,
     borderColor: Colors.border,
     borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.medium,
     color: Colors.textPrimary,
+  },
+  passwordToggle: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  passwordToggleText: {
+    fontSize: 18,
+  },
+  requirementsList: {
+    marginTop: Spacing.sm,
+    paddingLeft: Spacing.sm,
+    gap: 4,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requirementIcon: {
+    fontSize: Typography.fontSize.sm,
+  },
+  requirementLabel: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.success,
+  },
+  requirementLabelUnmet: {
+    color: Colors.textMuted,
   },
   errorBanner: {
     backgroundColor: Colors.errorBg,
@@ -349,6 +498,21 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontFamily: Typography.fontFamily.semiBold,
   },
+  registerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: Spacing.base,
+  },
+  registerText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.textSecondary,
+  },
+  registerLink: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.semiBold,
+    color: Colors.royalBlue,
+  },
   terms: {
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
@@ -357,12 +521,16 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.base,
   },
   termsLink: { color: Colors.royalBlue, fontFamily: Typography.fontFamily.medium },
-  abhaInfo: {
+  securityBadge: {
     backgroundColor: Colors.tealBg,
     borderRadius: BorderRadius.sm,
     padding: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
   },
-  abhaInfoText: {
+  securityBadgeText: {
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.tealDark,

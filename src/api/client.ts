@@ -8,10 +8,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiError } from './types';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
+// Backend base URL — override via EXPO_PUBLIC_API_URL env var for different environments.
+// Default points to the local FastAPI dev server (proxied through Expo on LAN).
+// Note: Use machine IP (10.243.124.226) instead of localhost for Expo tunnel
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? 'https://api.bionex.health/v1';
+  process.env.EXPO_PUBLIC_API_URL ?? 'http://10.243.124.226:8000/api/v1';
 
-export const USE_MOCK_DATA = true; // Toggle to false when real backend is ready
+// Set to `true` ONLY during isolated UI development when no backend is running.
+// In all integration/production environments this MUST be `false`.
+export const USE_MOCK_DATA = false;
+
+// ─── AsyncStorage token keys ─────────────────────────────────────────────────
+export const TOKEN_KEYS = {
+  ACCESS:  '@bionex_access_token',
+  REFRESH: '@bionex_refresh_token',
+} as const;
 
 // ─── Axios instance ───────────────────────────────────────────────────────────
 const apiClient: AxiosInstance = axios.create({
@@ -24,9 +35,10 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 // ─── Request Interceptor ──────────────────────────────────────────────────────
+// Attach the stored Bearer token to every outgoing request.
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const token = await AsyncStorage.getItem('@bionex_access_token');
+    const token = await AsyncStorage.getItem(TOKEN_KEYS.ACCESS);
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,44 +48,116 @@ apiClient.interceptors.request.use(
 );
 
 // ─── Response Interceptor ─────────────────────────────────────────────────────
+// Handles:
+//   1. Silent token refresh on 401 — uses the stored refresh_token (snake_case,
+//      matching the backend TokenRefresh schema: { refresh_token: string }).
+//   2. Normalises all error responses into a typed ApiError object.
+
+let _isRefreshing = false;
+let _pendingQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (err: unknown) => void;
+}> = [];
+
+/** Drain the queue of requests that were waiting on a token refresh. */
+function _drainQueue(token: string | null, error: unknown) {
+  _pendingQueue.forEach(({ resolve, reject }) =>
+    token ? resolve(token) : reject(error)
+  );
+  _pendingQueue = [];
+}
+
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
-    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as AxiosRequestConfig & {
+      _retry?: boolean;
+    };
 
-    // Token refresh on 401
+    // ── 401: attempt silent token refresh ───────────────────────────────────
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      try {
-        const refreshToken = await AsyncStorage.getItem('@bionex_refresh_token');
-        if (refreshToken) {
-          const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refreshToken,
-          });
-          await AsyncStorage.setItem('@bionex_access_token', data.accessToken);
+
+      // If a refresh is already in-flight, queue this request until it resolves.
+      if (_isRefreshing) {
+        return new Promise((resolve, reject) => {
+          _pendingQueue.push({ resolve, reject });
+        }).then((newToken) => {
           if (originalRequest.headers) {
             (originalRequest.headers as Record<string, string>).Authorization =
-              `Bearer ${data.accessToken}`;
+              `Bearer ${newToken}`;
           }
           return apiClient(originalRequest);
+        });
+      }
+
+      _isRefreshing = true;
+
+      try {
+        const refreshToken = await AsyncStorage.getItem(TOKEN_KEYS.REFRESH);
+        if (!refreshToken) throw new Error('No refresh token stored');
+
+        // Backend expects: POST /auth/refresh  body: { refresh_token: string }
+        // Backend returns: { access_token, refresh_token, token_type, role }
+        const { data } = await axios.post<{
+          access_token: string;
+          refresh_token: string;
+        }>(`http://10.243.124.226:8000/api/v1/auth/refresh`, {
+          refresh_token: refreshToken,          // ← snake_case as backend requires
+        });
+
+        const newAccessToken = data.access_token;
+        const newRefreshToken = data.refresh_token;
+
+        await AsyncStorage.setItem(TOKEN_KEYS.ACCESS, newAccessToken);
+        await AsyncStorage.setItem(TOKEN_KEYS.REFRESH, newRefreshToken);
+
+        // Update the original failed request and drain the waiting queue.
+        if (originalRequest.headers) {
+          (originalRequest.headers as Record<string, string>).Authorization =
+            `Bearer ${newAccessToken}`;
         }
-      } catch {
-        await AsyncStorage.multiRemove([
-          '@bionex_access_token',
-          '@bionex_refresh_token',
-        ]);
+        _drainQueue(newAccessToken, null);
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed — clear all tokens and force the user back to login.
+        await AsyncStorage.multiRemove([TOKEN_KEYS.ACCESS, TOKEN_KEYS.REFRESH]);
+        _drainQueue(null, refreshError);
+        // Propagate a standardised 401 error so the authStore can react.
+        const apiError: ApiError = {
+          code: 'SESSION_EXPIRED',
+          message: 'Your session has expired. Please log in again.',
+          statusCode: 401,
+        };
+        return Promise.reject(apiError);
+      } finally {
+        _isRefreshing = false;
       }
     }
 
-    // Parse error into standardised shape
+    // ── All other errors — normalise into ApiError ────────────────────────────
+    const responseData = error.response?.data;
+
+    // FastAPI validation errors come as { detail: [{type, loc, msg}] }
+    // Simple errors come as { detail: "string" }
+    let message: string;
+    if (typeof responseData?.detail === 'string') {
+      message = responseData.detail;
+    } else if (Array.isArray(responseData?.detail)) {
+      // Pydantic validation errors — join all messages
+      message = responseData.detail
+        .map((e: { msg?: string }) => e.msg ?? 'Validation error')
+        .join('; ');
+    } else {
+      message =
+        responseData?.message ?? error.message ?? 'An unexpected error occurred';
+    }
+
     const apiError: ApiError = {
-      code: error.response?.data?.code ?? 'UNKNOWN_ERROR',
-      message:
-        error.response?.data?.message ??
-        error.message ??
-        'An unexpected error occurred',
+      code: responseData?.code ?? 'UNKNOWN_ERROR',
+      message,
       statusCode: error.response?.status ?? 0,
-      details: error.response?.data?.details,
+      details: responseData?.details,
     };
 
     return Promise.reject(apiError);

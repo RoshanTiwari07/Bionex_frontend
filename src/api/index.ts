@@ -5,3 +5,4 @@ export * from './vitalsApi';
 export * from './recordsApi';
 export * from './diagnosticsApi';
 export * from './pharmacyApi';
+export * from './keysApi';

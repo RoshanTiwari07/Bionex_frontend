@@ -6,10 +6,15 @@ import type {
   VerifyPhoneOtpPayload,
   AuthResponse,
   OtpResponse,
+  LoginRequest,
+  RegisterRequest,
+  TokenResponseBackend,
+  UserOut,
+  AuthUser,
 } from './types';
 import { useMutation } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import apiClient from './client';
+import apiClient, { TOKEN_KEYS } from './client';
 
 // ─── Mock Helpers ──────────────────────────────────────────────────────────────
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -25,17 +30,165 @@ const MOCK_AUTH_RESPONSE: AuthResponse = {
     id: 'user-001',
     name: 'Prajesh Kumar',
     phone: '+919876543210',
+    role: 'PATIENT',
     abhaId: '12-3456-7890-1234',
     abhaAddress: 'prajesh.kumar@abdm',
-    avatar: undefined,
     dob: '1992-05-15',
     gender: 'MALE',
   },
   accessToken: 'mock-access-token-bionex',
   refreshToken: 'mock-refresh-token-bionex',
+  role: 'PATIENT',
+  requires2fa: false,
 };
 
-// ─── API Functions ─────────────────────────────────────────────────────────────
+// ─── Helper: Transform backend TokenResponse to frontend AuthResponse ────────
+/**
+ * Maps backend TokenResponseBackend to frontend AuthResponse.
+ * Handles snake_case → camelCase conversion and fetches user data.
+ */
+async function transformTokenResponse(
+  backendResponse: TokenResponseBackend
+): Promise<AuthResponse> {
+  // Store tokens immediately
+  await AsyncStorage.setItem(TOKEN_KEYS.ACCESS, backendResponse.access_token);
+  if (backendResponse.refresh_token) {
+    await AsyncStorage.setItem(TOKEN_KEYS.REFRESH, backendResponse.refresh_token);
+  }
+
+  // Fetch user profile data
+  const userOut = await fetchCurrentUser();
+
+  // Map user response to AuthUser
+  const authUser: AuthUser = {
+    id: userOut.id,
+    name: userOut.name,
+    phone: userOut.phone,
+    role: userOut.role as 'PATIENT' | 'DOCTOR' | 'ADMIN',
+    email: userOut.email || undefined,
+    dob: userOut.date_of_birth || undefined,
+    gender: userOut.gender as 'MALE' | 'FEMALE' | 'OTHER' | undefined,
+    is2faEnabled: userOut.is_2fa_enabled,
+  };
+
+  return {
+    user: authUser,
+    accessToken: backendResponse.access_token,
+    refreshToken: backendResponse.refresh_token || '',
+    role: backendResponse.role as 'PATIENT' | 'DOCTOR' | 'ADMIN',
+    requires2fa: backendResponse.requires_2fa ?? false,
+  };
+}
+
+// ─── API Functions – Password-based Authentication ───────────────────────────
+
+/**
+ * Login with phone number and password (password-based auth).
+ * Backend enforces:
+ *   - Phone in E.164 format: +[1-9]\d{6,14}
+ *   - Password: 8+ chars, uppercase, lowercase, digit, special char
+ */
+export async function login(payload: LoginRequest): Promise<AuthResponse> {
+  if (USE_MOCK_DATA) {
+    await delay(1500);
+    if (payload.password !== 'Bionex@123') {
+      throw {
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid phone or password.',
+        statusCode: 401,
+      };
+    }
+    return MOCK_AUTH_RESPONSE;
+  }
+
+  try {
+    const { data } = await apiClient.post<TokenResponseBackend>(
+      '/auth/login',
+      {
+        phone: payload.phone,
+        password: payload.password,
+      }
+    );
+    return transformTokenResponse(data);
+  } catch (error: any) {
+    // Handle specific backend errors
+    if (error.statusCode === 429) {
+      throw {
+        code: 'ACCOUNT_LOCKED',
+        message: error.message || 'Account locked due to too many failed attempts.',
+        statusCode: 429,
+      };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Register a new user account.
+ * Backend enforces:
+ *   - Phone in E.164 format: +[1-9]\d{6,14}
+ *   - Password: 8+ chars, uppercase, lowercase, digit, special char
+ */
+export async function register(payload: RegisterRequest): Promise<AuthResponse> {
+  if (USE_MOCK_DATA) {
+    await delay(1500);
+    return MOCK_AUTH_RESPONSE;
+  }
+
+  try {
+    const { data } = await apiClient.post<UserOut>(
+      '/auth/register',
+      {
+        name: payload.name,
+        phone: payload.phone,
+        password: payload.password,
+        email: payload.email || null,
+        role: payload.role || 'PATIENT',
+      }
+    );
+
+    // After registration, automatically log in
+    // Note: Backend doesn't return tokens from register, user must login after
+    // So we'll return a response indicating registration success
+    const authUser: AuthUser = {
+      id: data.id,
+      name: data.name,
+      phone: data.phone,
+      role: data.role as 'PATIENT' | 'DOCTOR' | 'ADMIN',
+      email: data.email || undefined,
+      is2faEnabled: data.is_2fa_enabled,
+    };
+
+    return {
+      user: authUser,
+      accessToken: '',
+      refreshToken: '',
+      role: data.role as 'PATIENT' | 'DOCTOR' | 'ADMIN',
+      requires2fa: false,
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Fetch current authenticated user's profile.
+ * Merged endpoint: returns UserOut + PatientOut
+ */
+export async function fetchCurrentUser(): Promise<UserOut> {
+  const { data } = await apiClient.get<UserOut>('/patients/me');
+  return data;
+}
+
+/**
+ * Logout: clear tokens from storage and mark session as expired.
+ */
+export async function logout(): Promise<void> {
+  await AsyncStorage.multiRemove([TOKEN_KEYS.ACCESS, TOKEN_KEYS.REFRESH]);
+}
+
+// ─── OTP-based Authentication (Legacy/Phase 2) ──────────────────────────────
+
 export async function requestAbhaOtp(
   payload: RequestAbhaOtpPayload
 ): Promise<OtpResponse> {
@@ -43,6 +196,7 @@ export async function requestAbhaOtp(
     await delay(1200);
     return { ...MOCK_OTP_RESPONSE, txnId: 'mock-txn-abha-' + Date.now() };
   }
+  // Backend endpoint TBD in Phase 3
   const { data } = await apiClient.post('/auth/abha/request-otp', payload);
   return data.data;
 }
@@ -59,6 +213,7 @@ export async function verifyAbhaOtp(
     await AsyncStorage.setItem('@bionex_refresh_token', MOCK_AUTH_RESPONSE.refreshToken);
     return MOCK_AUTH_RESPONSE;
   }
+  // Backend endpoint TBD in Phase 3
   const { data } = await apiClient.post('/auth/abha/verify-otp', payload);
   return data.data;
 }
@@ -70,6 +225,7 @@ export async function requestPhoneOtp(
     await delay(1000);
     return { ...MOCK_OTP_RESPONSE, txnId: 'mock-txn-phone-' + Date.now() };
   }
+  // Backend endpoint TBD in Phase 2
   const { data } = await apiClient.post('/auth/phone/request-otp', payload);
   return data.data;
 }
@@ -86,15 +242,25 @@ export async function verifyPhoneOtp(
     await AsyncStorage.setItem('@bionex_refresh_token', MOCK_AUTH_RESPONSE.refreshToken);
     return MOCK_AUTH_RESPONSE;
   }
+  // Backend endpoint TBD in Phase 2
   const { data } = await apiClient.post('/auth/phone/verify-otp', payload);
   return data.data;
 }
 
-export async function logout(): Promise<void> {
-  await AsyncStorage.multiRemove(['@bionex_access_token', '@bionex_refresh_token']);
+// ─── React Query Hooks ─────────────────────────────────────────────────────────
+
+export function useLogin() {
+  return useMutation({ mutationFn: login });
 }
 
-// ─── React Query Hooks ─────────────────────────────────────────────────────────
+export function useRegister() {
+  return useMutation({ mutationFn: register });
+}
+
+export function useFetchCurrentUser() {
+  return useMutation({ mutationFn: fetchCurrentUser });
+}
+
 export function useRequestAbhaOtp() {
   return useMutation({ mutationFn: requestAbhaOtp });
 }
