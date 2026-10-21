@@ -16,9 +16,9 @@
  *     a fresh install or new device
  *
  * Key layout in SecureStore:
- *   @bionex_ec_private_key_jwk  — JWK JSON of the ECDH P-256 private key
- *   @bionex_key_fingerprint     — SHA-256 hex of the corresponding public key
- *   @bionex_key_registered      — "true" | "false" — was public key sent to server?
+ *   bionex_ec_private_key_jwk  — JWK JSON of the ECDH P-256 private key
+ *   bionex_key_fingerprint     — SHA-256 hex of the corresponding public key
+ *   bionex_key_registered      — "true" | "false" — was public key sent to server?
  *
  * @module keyStorage
  */
@@ -26,11 +26,14 @@
 import * as SecureStore from 'expo-secure-store';
 
 // ─── Storage Key Constants ────────────────────────────────────────────────────
+// NOTE: SecureStore keys must contain ONLY alphanumeric chars, ".", "-", "_"
+// The "@" prefix used in AsyncStorage keys is NOT allowed in SecureStore
 
 const STORE_KEY = {
-  PRIVATE_KEY_JWK: '@bionex_ec_private_key_jwk',
-  KEY_FINGERPRINT:  '@bionex_key_fingerprint',
-  KEY_REGISTERED:   '@bionex_key_registered',
+  PRIVATE_KEY_JWK:        'bionex_ec_private_key_jwk',
+  KEY_FINGERPRINT:        'bionex_key_fingerprint',
+  KEY_REGISTERED:         'bionex_key_registered',
+  REGISTRATION_SIGNATURE: 'bionex_registration_signature',
 } as const;
 
 // ─── SecureStore Access Policy ────────────────────────────────────────────────
@@ -58,10 +61,12 @@ const SECURE_OPTS: SecureStore.SecureStoreOptions = {
  *
  * @param privateKeyJWK   - JSON.stringify'd JsonWebKey for the ECDH P-256 private key
  * @param fingerprint     - SHA-256 hex of the public key (64 chars)
+ * @param registrationSig - (Optional) base64url-encoded ECDSA signature for public key decryption
  */
 export async function savePrivateKey(
   privateKeyJWK: string,
   fingerprint: string,
+  registrationSig?: string,
 ): Promise<void> {
   if (!privateKeyJWK || privateKeyJWK.length < 10) {
     throw new Error('KeyStorage: privateKeyJWK is empty or too short');
@@ -70,13 +75,21 @@ export async function savePrivateKey(
     throw new Error('KeyStorage: fingerprint must be 64 hex characters');
   }
 
-  // Write all three atomically (SecureStore operations are individually atomic)
-  await Promise.all([
+  const writes = [
     SecureStore.setItemAsync(STORE_KEY.PRIVATE_KEY_JWK, privateKeyJWK, SECURE_OPTS),
     SecureStore.setItemAsync(STORE_KEY.KEY_FINGERPRINT,  fingerprint,    SECURE_OPTS),
     // Reset registration flag — public key has not been sent to server yet
     SecureStore.setItemAsync(STORE_KEY.KEY_REGISTERED,   'false',        SECURE_OPTS),
-  ]);
+  ];
+
+  // Optionally store the registration signature for public key decryption
+  if (registrationSig) {
+    writes.push(
+      SecureStore.setItemAsync(STORE_KEY.REGISTRATION_SIGNATURE, registrationSig, SECURE_OPTS),
+    );
+  }
+
+  await Promise.all(writes);
 }
 
 /**
@@ -122,23 +135,34 @@ export async function isKeyRegistered(): Promise<boolean> {
 }
 
 /**
+ * Retrieve the stored registration signature (base64url-encoded ECDSA signature).
+ * Returns null if not set.
+ */
+export async function getRegistrationSignature(): Promise<string | null> {
+  return SecureStore.getItemAsync(STORE_KEY.REGISTRATION_SIGNATURE, SECURE_OPTS);
+}
+
+/**
  * Read all stored key metadata at once (avoids multiple SecureStore round-trips).
  */
 export async function getKeyStatus(): Promise<{
   hasKey: boolean;
   isRegistered: boolean;
   fingerprint: string | null;
+  registrationSignature: string | null;
 }> {
-  const [privateKey, registered, fingerprint] = await Promise.all([
+  const [privateKey, registered, fingerprint, signature] = await Promise.all([
     SecureStore.getItemAsync(STORE_KEY.PRIVATE_KEY_JWK, SECURE_OPTS),
     SecureStore.getItemAsync(STORE_KEY.KEY_REGISTERED,  SECURE_OPTS),
     SecureStore.getItemAsync(STORE_KEY.KEY_FINGERPRINT, SECURE_OPTS),
+    SecureStore.getItemAsync(STORE_KEY.REGISTRATION_SIGNATURE, SECURE_OPTS),
   ]);
 
   return {
-    hasKey:       privateKey !== null && privateKey.trim().length > 0,
-    isRegistered: registered === 'true',
-    fingerprint:  fingerprint,
+    hasKey:                 privateKey !== null && privateKey.trim().length > 0,
+    isRegistered:           registered === 'true',
+    fingerprint:            fingerprint,
+    registrationSignature:  signature,
   };
 }
 
@@ -161,5 +185,6 @@ export async function deleteAllKeys(): Promise<void> {
     SecureStore.deleteItemAsync(STORE_KEY.PRIVATE_KEY_JWK, SECURE_OPTS),
     SecureStore.deleteItemAsync(STORE_KEY.KEY_FINGERPRINT,  SECURE_OPTS),
     SecureStore.deleteItemAsync(STORE_KEY.KEY_REGISTERED,   SECURE_OPTS),
+    SecureStore.deleteItemAsync(STORE_KEY.REGISTRATION_SIGNATURE, SECURE_OPTS),
   ]);
 }

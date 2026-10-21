@@ -7,8 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Star, Clock, Home as HomeIcon, CheckCircle2, Bot } from 'lucide-react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
-import { useLabTestDetail } from '../../api/diagnosticsApi';
-import { MOCK_LAB_PARTNERS } from '../../api/diagnosticsApi';
+import { useLabTestDetail , MOCK_LAB_PARTNERS } from '../../api/diagnosticsApi';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 
 type RouteProps = RouteProp<RootStackParamList, 'LabTestDetail'>;

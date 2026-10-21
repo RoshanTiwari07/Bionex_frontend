@@ -164,7 +164,12 @@ export function HomeScreen() {
           <Text style={styles.sectionTitle}>What you can do with Bionex.</Text>
           <View style={styles.bannerRow}>
             {/* Upload Banner */}
-            <TouchableOpacity id="btn-upload-today" activeOpacity={0.88} style={styles.uploadBanner}>
+            <TouchableOpacity
+              id="btn-upload-today"
+              activeOpacity={0.88}
+              style={styles.uploadBanner}
+              onPress={() => navigation.navigate('Upload')}
+            >
               <LinearGradient
                 colors={[Colors.white, Colors.tealBg]}
                 style={styles.bannerGradient}

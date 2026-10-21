@@ -1,5 +1,4 @@
-import { USE_MOCK_DATA } from './client';
-import apiClient from './client';
+import apiClient, { USE_MOCK_DATA } from './client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   LabTest,

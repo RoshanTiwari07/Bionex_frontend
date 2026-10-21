@@ -479,6 +479,26 @@ export interface EncryptedSessionKeyPayload {
   expires_at: string;
 }
 
+/**
+ * Encrypted public key blob from GET /encryption/doctors/{doctor_id}/public-key
+ * This is an encrypted PEM stored server-side that the client must decrypt.
+ *
+ * Format: {"v": 1, "ct": "base64url", "n": "base64url", "a": "AES-256-GCM"}
+ *   • v  — version (1)
+ *   • ct — base64url-encoded AES-256-GCM ciphertext
+ *   • n  — base64url-encoded 12-byte nonce
+ *   • a  — algorithm name ("AES-256-GCM")
+ *
+ * Decryption uses HKDF-SHA256(ikm=registration_signature, salt=doctor_id_bytes)
+ * to derive the encryption key on-device.
+ */
+export interface EncryptedPublicKeyBlob {
+  v: number;  // version
+  ct: string; // base64url ciphertext
+  n: string;  // base64url nonce
+  a: string;  // algorithm (AES-256-GCM)
+}
+
 /** Audit log entry from GET /encryption/audit/logs */
 export interface AuditLogEntry {
   id: string;

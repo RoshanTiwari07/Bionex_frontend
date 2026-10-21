@@ -9,10 +9,13 @@ import { ApiError } from './types';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 // Backend base URL — override via EXPO_PUBLIC_API_URL env var for different environments.
-// Default points to the local FastAPI dev server (proxied through Expo on LAN).
-// Note: Use machine IP (10.243.124.226) instead of localhost for Expo tunnel
+// Default points to the local FastAPI dev server on localhost:8000
+// For mobile/tunnel access: set EXPO_PUBLIC_API_URL to your machine IP (e.g., http://192.168.x.x:8000/api/v1)
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? 'http://10.243.124.226:8000/api/v1';
+  process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1';
+
+console.log('[API Client] Initialized with API_BASE_URL:', API_BASE_URL);
+console.log('[API Client] Environment EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
 
 // Set to `true` ONLY during isolated UI development when no backend is running.
 // In all integration/production environments this MUST be `false`.
@@ -27,21 +30,46 @@ export const TOKEN_KEYS = {
 // ─── Axios instance ───────────────────────────────────────────────────────────
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000, // Increased from 15000ms to 30000ms for slower networks
   headers: {
-    'Content-Type': 'application/json',
     Accept: 'application/json',
+    // NOTE: Do NOT set Content-Type here — let axios auto-detect
+    // - For JSON requests: axios sets 'application/json'
+    // - For FormData: browser/axios sets 'multipart/form-data' with boundary
   },
+  withCredentials: false, // Important for CORS in web browser
 });
 
 // ─── Request Interceptor ──────────────────────────────────────────────────────
 // Attach the stored Bearer token to every outgoing request.
+// Special handling for FormData: explicitly set multipart/form-data.
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = await AsyncStorage.getItem(TOKEN_KEYS.ACCESS);
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // CRITICAL FIX: For FormData requests on React Native, explicitly set multipart/form-data
+    // Axios on React Native doesn't auto-detect FormData like browsers do
+    if (config.data instanceof FormData) {
+      console.log('[API Client] Request Interceptor: FormData detected');
+      console.log('[API Client] Setting multipart/form-data header explicitly');
+      
+      // On React Native, we MUST explicitly set this header
+      // On web, this might include a boundary; on RN, fetch will handle it
+      if (config.headers) {
+        config.headers['Content-Type'] = 'multipart/form-data';
+      }
+      
+      console.log('[API Client] FormData headers:', config.headers);
+    } else if (config.data && typeof config.data === 'object' && !(config.data instanceof Blob)) {
+      // For non-FormData JSON requests, ensure JSON content type
+      if (config.headers && !config.headers['Content-Type']) {
+        config.headers['Content-Type'] = 'application/json';
+      }
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)
@@ -54,10 +82,10 @@ apiClient.interceptors.request.use(
 //   2. Normalises all error responses into a typed ApiError object.
 
 let _isRefreshing = false;
-let _pendingQueue: Array<{
+let _pendingQueue: {
   resolve: (token: string) => void;
   reject: (err: unknown) => void;
-}> = [];
+}[] = [];
 
 /** Drain the queue of requests that were waiting on a token refresh. */
 function _drainQueue(token: string | null, error: unknown) {
@@ -70,6 +98,20 @@ function _drainQueue(token: string | null, error: unknown) {
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
+    console.log('[API Client] Full error object:', {
+      message: error.message,
+      code: error.code,
+      statusCode: error.response?.status,
+      url: error.config?.url,
+      method: error.config?.method,
+      baseURL: error.config?.baseURL,
+      fullUrl: error.config?.baseURL + error.config?.url,
+      responseData: error.response?.data,
+      isNetworkError: !error.response, // No response = network error
+      errno: error.errno,
+      syscall: error.syscall,
+    });
+
     const originalRequest = error.config as AxiosRequestConfig & {
       _retry?: boolean;
     };
@@ -102,7 +144,7 @@ apiClient.interceptors.response.use(
         const { data } = await axios.post<{
           access_token: string;
           refresh_token: string;
-        }>(`http://10.243.124.226:8000/api/v1/auth/refresh`, {
+        }>(`${API_BASE_URL}/auth/refresh`, {
           refresh_token: refreshToken,          // ← snake_case as backend requires
         });
 

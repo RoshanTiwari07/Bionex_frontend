@@ -1,4 +1,4 @@
-import { USE_MOCK_DATA } from './client';
+import apiClient, { USE_MOCK_DATA , TOKEN_KEYS } from './client';
 import type {
   RequestAbhaOtpPayload,
   VerifyAbhaOtpPayload,
@@ -14,7 +14,6 @@ import type {
 } from './types';
 import { useMutation } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import apiClient, { TOKEN_KEYS } from './client';
 
 // ─── Mock Helpers ──────────────────────────────────────────────────────────────
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -45,30 +44,24 @@ const MOCK_AUTH_RESPONSE: AuthResponse = {
 // ─── Helper: Transform backend TokenResponse to frontend AuthResponse ────────
 /**
  * Maps backend TokenResponseBackend to frontend AuthResponse.
- * Handles snake_case → camelCase conversion and fetches user data.
+ * Stores tokens immediately; full user profile is fetched separately by authStore.
  */
 async function transformTokenResponse(
   backendResponse: TokenResponseBackend
 ): Promise<AuthResponse> {
-  // Store tokens immediately
+  // Store tokens immediately so subsequent requests are authenticated
   await AsyncStorage.setItem(TOKEN_KEYS.ACCESS, backendResponse.access_token);
   if (backendResponse.refresh_token) {
     await AsyncStorage.setItem(TOKEN_KEYS.REFRESH, backendResponse.refresh_token);
   }
 
-  // Fetch user profile data
-  const userOut = await fetchCurrentUser();
-
-  // Map user response to AuthUser
+  // Return minimal AuthResponse with role from token
+  // Full user profile will be fetched by authStore.fetchUser() after login
   const authUser: AuthUser = {
-    id: userOut.id,
-    name: userOut.name,
-    phone: userOut.phone,
-    role: userOut.role as 'PATIENT' | 'DOCTOR' | 'ADMIN',
-    email: userOut.email || undefined,
-    dob: userOut.date_of_birth || undefined,
-    gender: userOut.gender as 'MALE' | 'FEMALE' | 'OTHER' | undefined,
-    is2faEnabled: userOut.is_2fa_enabled,
+    id: '',  // Placeholder - will be populated by fetchUser()
+    name: '', // Placeholder - will be populated by fetchUser()
+    phone: '',  // Placeholder - will be populated by fetchUser()
+    role: backendResponse.role as 'PATIENT' | 'DOCTOR' | 'ADMIN',
   };
 
   return {
@@ -102,6 +95,7 @@ export async function login(payload: LoginRequest): Promise<AuthResponse> {
   }
 
   try {
+    console.log('[AuthAPI] login: starting with payload:', { phone: payload.phone });
     const { data } = await apiClient.post<TokenResponseBackend>(
       '/auth/login',
       {
@@ -109,8 +103,16 @@ export async function login(payload: LoginRequest): Promise<AuthResponse> {
         password: payload.password,
       }
     );
-    return transformTokenResponse(data);
+    console.log('[AuthAPI] login: success');
+    const response = await transformTokenResponse(data);
+    
+    // Fetch full user profile asynchronously (authStore will handle this)
+    // Don't block login on profile fetch
+    console.log('[AuthAPI] login: tokens stored, will fetch user profile via authStore');
+    
+    return response;
   } catch (error: any) {
+    console.error('[AuthAPI] login: error caught:', error);
     // Handle specific backend errors
     if (error.statusCode === 429) {
       throw {

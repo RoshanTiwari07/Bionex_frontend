@@ -136,11 +136,23 @@ function bytesToBase64Url(bytes: Uint8Array): string {
     .replace(/=+$/, '');
 }
 
-/** Encode Uint8Array to lowercase hex */
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+/**
+ * Decode base64url (RFC 4648 §5) to Uint8Array.
+ * Handles padding restoration automatically.
+ */
+export function base64UrlToBytes(b64url: string): Uint8Array {
+  // Add back padding
+  const padding = 4 - (b64url.length % 4);
+  const padded = b64url + (padding === 4 ? '' : '='.repeat(padding));
+
+  // Convert to standard base64
+  const standard = padded.replace(/-/g, '+').replace(/_/g, '/');
+
+  // Decode
+  const binary = atob(standard);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+  return out;
 }
 
 /**
@@ -179,12 +191,15 @@ export async function generateKeyPair(): Promise<GeneratedKeyPair> {
   let keyPair: CryptoKeyPair;
 
   try {
+    console.log('[CryptoEngine] generateKeyPair: calling crypto.subtle.generateKey');
     keyPair = await crypto.subtle.generateKey(
       { name: 'ECDH', namedCurve: 'P-256' },
       true,            // extractable — required to export JWK for SecureStore
       ['deriveBits'],  // only deriveBits usage; not deriveKey (prevents misuse)
     );
-  } catch {
+    console.log('[CryptoEngine] generateKeyPair: key generation successful', keyPair);
+  } catch (err) {
+    console.error('[CryptoEngine] generateKeyPair: key generation failed', err);
     throw new CryptoError('KEY_GENERATION_FAILED', 'Failed to generate ECDH key pair');
   }
 
@@ -193,11 +208,14 @@ export async function generateKeyPair(): Promise<GeneratedKeyPair> {
   let privateKeyJwk: JsonWebKey;
 
   try {
+    console.log('[CryptoEngine] generateKeyPair: exporting keys');
     [publicKeyDer, privateKeyJwk] = await Promise.all([
       crypto.subtle.exportKey('spki', keyPair.publicKey),
       crypto.subtle.exportKey('jwk', keyPair.privateKey),
     ]);
-  } catch {
+    console.log('[CryptoEngine] generateKeyPair: export successful');
+  } catch (err) {
+    console.error('[CryptoEngine] generateKeyPair: export failed', err);
     throw new CryptoError('KEY_EXPORT_FAILED', 'Failed to export generated key pair');
   }
 
@@ -216,7 +234,8 @@ export async function generateKeyPair(): Promise<GeneratedKeyPair> {
       false,
       [],
     );
-  } catch {
+  } catch (err) {
+    console.error('[CryptoEngine] generateKeyPair: validation failed', err);
     throw new CryptoError(
       'KEY_VALIDATION_FAILED',
       'Generated public key failed self-validation — this should never happen',
@@ -283,7 +302,7 @@ export async function computePublicKeyFingerprint(publicKeyPEM: string): Promise
  *
  * @param nonce         - 64-char hex string received from GET /keypairs/registration-challenge
  * @param privateKeyJWK - JWK string from SecureStore (the device's ECDH P-256 private key)
- * @returns             - base64url-encoded DER-encoded ECDSA signature (≈ 70–72 bytes)
+ * @returns             - Object with base64url-encoded signature and raw signature bytes
  *
  * @throws {CryptoError}
  *   INVALID_PRIVATE_KEY — JWK is malformed or not a P-256 key
@@ -292,7 +311,7 @@ export async function computePublicKeyFingerprint(publicKeyPEM: string): Promise
 export async function signRegistrationNonce(
   nonce: string,
   privateKeyJWK: string,
-): Promise<string> {
+): Promise<{ signatureB64Url: string; signatureBytes: Uint8Array }> {
   if (!nonce || nonce.length < 32) {
     throw new CryptoError('NONCE_SIGN_FAILED', 'Registration nonce is missing or too short');
   }
@@ -348,7 +367,9 @@ export async function signRegistrationNonce(
   // Web Crypto outputs IEEE P1363 format (r ∥ s, 64 bytes for P-256).
   // Server should accept P1363 or DER — document which format your backend expects.
   // P1363 (raw r∥s) is simpler; DER conversion is not needed unless backend requires it.
-  return bytesToBase64Url(new Uint8Array(signatureBuffer));
+  const signatureBytes = new Uint8Array(signatureBuffer);
+  const signatureB64Url = bytesToBase64Url(signatureBytes);
+  return { signatureB64Url, signatureBytes };
 }
 
 // ─── Session Key Decryption ───────────────────────────────────────────────────

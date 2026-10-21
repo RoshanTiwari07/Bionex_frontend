@@ -9,9 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../theme';
 import { useCartStore } from '../../store/cartStore';
-import { useMedicineSearch } from '../../api/pharmacyApi';
-import { MOCK_CATEGORIES } from '../../api/pharmacyApi';
-import { MOCK_MEDICINES } from '../../api/pharmacyApi';
+import { useMedicineSearch , MOCK_CATEGORIES , MOCK_MEDICINES } from '../../api/pharmacyApi';
 import type { Medicine } from '../../api/types';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 

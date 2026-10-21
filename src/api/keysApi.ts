@@ -37,9 +37,11 @@ import type {
   SessionListItem,
   CreateSessionPayload,
   EncryptedSessionKeyPayload,
+  EncryptedPublicKeyBlob,
   AuditLogEntry,
   PaginatedResponse,
 } from './types';
+import { isValidEcdhPublicKeyPEM } from '../utils/cryptoEngine';
 
 // ─── URL prefix ───────────────────────────────────────────────────────────────
 
@@ -152,6 +154,87 @@ export async function getMyKeypair(): Promise<KeypairResponse | null> {
 export async function revokeMyKeypair(): Promise<void> {
   await apiClient.delete(`${ENC}/keypairs/me`);
 }
+
+/**
+ * Fetch the encrypted public key for a doctor.
+ *
+ * Returns the encrypted PEM blob that must be decrypted on-device using
+ * the patient's registration signature as the key derivation seed.
+ *
+ * @param doctorId - UUID of the doctor
+ * @returns EncryptedPublicKeyBlob - encrypted JSON: {v, ct, n, a}
+ *
+ * @throws ApiError
+ *   404 DOCTOR_NO_KEYPAIR — doctor has no registered public key
+ */
+export async function getEncryptedPublicKey(
+  doctorId: string,
+): Promise<EncryptedPublicKeyBlob> {
+  if (!doctorId?.trim()) throw new Error('keysApi: doctorId is required');
+  
+  // Backend returns the encrypted JSON as a string that needs to be parsed
+  const { data } = await apiClient.get<Record<string, unknown>>(
+    `${ENC}/doctors/${encodeURIComponent(doctorId)}/public-key`,
+  );
+  
+  return data as EncryptedPublicKeyBlob;
+}
+
+/**
+ * Fetch and decrypt a doctor's public key for session establishment.
+ *
+ * This is a convenience wrapper that:
+ *   1. Fetches the encrypted public key blob from the server
+ *   2. Retrieves the patient's registration signature from SecureStore
+ *   3. Decrypts the public key on-device using HKDF-SHA256 derivation
+ *
+ * The decrypted PEM can then be used for ECDH key agreement.
+ *
+ * @param doctorId - UUID of the doctor
+ * @returns Decrypted public key PEM string
+ *
+ * @throws Error if decryption fails or signature is missing
+ */
+export async function fetchAndDecryptDoctorPublicKey(
+  doctorId: string,
+): Promise<string> {
+  // Import here to avoid circular dependency
+  const { getRegistrationSignature } = await import('../utils/keyStorage');
+  const { decryptPublicKey } = await import('../utils/publicKeyDecryption');
+  const { base64UrlToBytes } = await import('../utils/cryptoEngine');
+  
+  if (!doctorId?.trim()) throw new Error('keysApi: doctorId is required');
+
+  // 1. Fetch encrypted blob from server
+  const encryptedBlob = await getEncryptedPublicKey(doctorId);
+
+  // 2. Get stored registration signature
+  const signatureB64Url = await getRegistrationSignature();
+  if (!signatureB64Url) {
+    throw new Error('keysApi: no registration signature found in SecureStore - cannot decrypt public key');
+  }
+
+  // 3. Convert signature from base64url to bytes
+  const signatureBytes = base64UrlToBytes(signatureB64Url);
+
+  // 4. Decrypt the public key (doctor_id is used as salt internally)
+  const publicKeyPEM = await decryptPublicKey(
+    encryptedBlob,
+    signatureBytes,
+    doctorId,  // This is used as salt in HKDF
+  );
+
+  return publicKeyPEM;
+}
+
+/**
+ * Validate an ECDH P-256 public key PEM.
+ * Re-exported from cryptoEngine for convenience.
+ *
+ * @param pem - PEM-encoded public key
+ * @returns true if valid, false otherwise
+ */
+export { isValidEcdhPublicKeyPEM };
 
 // ─── Session Endpoints ────────────────────────────────────────────────────────
 

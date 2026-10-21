@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AuthUser } from '../api/types';
 import { fetchCurrentUser } from '../api/authApi';
+import { useCryptoStore } from './cryptoStore';
+import { queryClient } from '../lib/queryClient';
 
 interface AuthState {
   user: AuthUser | null;
@@ -36,6 +38,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   clearError: () => set({ error: null }),
 
   logout: async () => {
+    // Clear React Query cache to prevent stale data
+    queryClient.clear();
+    // Clear crypto keys
+    await useCryptoStore.getState().clearKeys();
+    // Then clear auth tokens
     await AsyncStorage.multiRemove(['@bionex_access_token', '@bionex_refresh_token']);
     set({ user: null, isAuthenticated: false, txnId: null, requires2fa: false, error: null });
   },
@@ -71,6 +78,15 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
         error: null,
       });
+
+      // Initialize crypto keys after successful authentication
+      try {
+        await useCryptoStore.getState().initializeKeys();
+      } catch (cryptoErr) {
+        console.warn('Failed to initialize crypto keys:', cryptoErr);
+        // Don't fail auth flow if crypto init fails - user can still use app
+        // but document upload will be blocked
+      }
     } catch (err: any) {
       // If 401, token is invalid/expired - clear and force re-login
       if (err.statusCode === 401) {

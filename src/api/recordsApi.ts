@@ -1,5 +1,4 @@
-import { USE_MOCK_DATA } from './client';
-import apiClient from './client';
+import apiClient, { USE_MOCK_DATA } from './client';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { MedicalRecord, UploadRecordPayload, UploadRecordResponse, OcrParseStatus } from './types';
 

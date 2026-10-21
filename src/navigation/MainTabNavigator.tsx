@@ -17,7 +17,7 @@ import { HomeScreen } from '../screens/home/HomeScreen';
 import { RecordsScreen } from '../screens/records/RecordsScreen';
 import { LabTestsScreen } from '../screens/labs/LabTestsScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
-import { UploadScreen } from '../screens/records/UploadScreen';
+import DocumentsScreen from '../screens/DocumentsScreen';
 
 export type MainTabParamList = {
   Home: undefined;
@@ -126,7 +126,7 @@ export function MainTabNavigator() {
       />
       <Tab.Screen
         name="Upload"
-        component={UploadScreen}
+        component={DocumentsScreen}
         options={{ tabBarLabel: '' }}
       />
       <Tab.Screen

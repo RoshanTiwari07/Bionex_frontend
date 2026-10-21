@@ -63,7 +63,8 @@ function validatePhone(phone: string): boolean {
 
 export function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { setUser, setRequires2fa } = useAuthStore();
+  const authStore = useAuthStore();
+  const { setUser, setRequires2fa } = authStore;
   const login = useLogin();
 
   const [phoneValue, setPhoneValue] = useState('');
@@ -96,7 +97,7 @@ export function LoginScreen() {
         password: passwordValue,
       });
 
-      // Store user data
+      // Store basic user data from token
       setUser(result.user);
 
       // Handle 2FA if required
@@ -106,6 +107,15 @@ export function LoginScreen() {
         Alert.alert('2FA Required', 'Two-factor authentication setup required.');
         return;
       }
+
+      // Fetch full user profile asynchronously after login
+      // This populates the auth store with complete user data
+      setTimeout(() => {
+        authStore.fetchUser().catch((err) => {
+          console.error('Failed to fetch user profile after login:', err);
+          // Don't block the login flow if profile fetch fails
+        });
+      }, 0);
 
       // Success - user will be navigated by auth state change in App.tsx
     } catch (err: any) {
