@@ -108,7 +108,7 @@ export default function DocumentsScreen() {
       const mappedDocs: Document[] = docs.map((doc: any) => ({
         id: doc.id,
         name: doc.title,
-        category: doc.category || 'medical_record',
+        category: doc.category || 'medical_report',
         uploadedAt: doc.created_at,
         size: doc.size_bytes || 0,
         encryptionStatus: 'encrypted', // Default - can be updated based on sharing status
@@ -244,7 +244,7 @@ export default function DocumentsScreen() {
         const uploadedDoc = await documentsApi.uploadDocument({
           file: fileToUpload,
           title: file.name.split('.')[0],
-          category: 'medical_record',
+          category: 'medical_report',
           description: 'Uploaded from mobile app',
         });
 
@@ -263,7 +263,7 @@ export default function DocumentsScreen() {
         const newDoc: Document = {
           id: uploadedDoc.id,
           name: uploadedDoc.title,
-          category: uploadedDoc.category || 'medical_record',
+          category: uploadedDoc.category || 'medical_report',
           uploadedAt: uploadedDoc.created_at,
           size: uploadedDoc.size_bytes || 0,
           encryptionStatus: 'encrypted',

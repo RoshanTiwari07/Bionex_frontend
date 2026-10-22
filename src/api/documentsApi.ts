@@ -34,7 +34,7 @@ export interface DocumentListItem {
   id: string;
   title: string;
   description?: string;
-  category: 'medical_record' | 'prescription' | 'lab_result' | 'other';
+  category: 'medical_report' | 'prescription' | 'lab_report' | 'imaging' | 'insurance' | 'other';
   original_filename: string;
   created_at: string; // ISO 8601
   size_bytes: number;
