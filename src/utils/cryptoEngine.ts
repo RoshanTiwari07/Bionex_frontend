@@ -36,6 +36,7 @@
 
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { chacha20poly1305 } from '@noble/ciphers/chacha.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
